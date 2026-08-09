@@ -1,3 +1,20 @@
+import_ip_log:
+  name: Import external IP log
+  description: >-
+    Import external IP history from a CSV file — one "date,ip" pair per line,
+    e.g. "2026-01-05 09:30:00,203.0.113.7". Imported rows merge with the
+    existing log by date and consecutive duplicate IPs collapse, so running it
+    twice is safe. The file must be inside the Home Assistant configuration
+    directory. Requires external IP change logging to be enabled.
+  fields:
+    path:
+      name: File path
+      description: Path to the CSV file.
+      required: true
+      example: "/config/my_ip_history.csv"
+      selector:
+        text:
+
 forget_device:
   name: Forget device
   description: >-

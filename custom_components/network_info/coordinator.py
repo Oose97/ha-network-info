@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
+from pathlib import Path
 from typing import Any
 
 from aiohttp import ClientError, ClientTimeout
@@ -313,6 +314,36 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
 
         self._store.async_delay_save(lambda: memory, 30)
 
+    @property
+    def ip_log_enabled(self) -> bool:
+        return self._log_external_ip
+
+    async def async_import_ip_log(self, path: str) -> int:
+        """Merge "date,ip" rows from a CSV file into the change log.
+
+        Rows are merged with the existing log by date and consecutive
+        duplicate IPs collapse, so importing is idempotent. Returns the
+        resulting log length.
+        """
+        if self._ip_log is None:
+            self._ip_log = await self._ip_log_store.async_load() or []
+        rows = await self.hass.async_add_executor_job(
+            _read_ip_log_csv, path, self.hass.config.path()
+        )
+        merged = sorted(rows + self._ip_log, key=lambda r: r["date"])
+        deduped: list[dict[str, str]] = []
+        for row in merged:
+            if deduped and deduped[-1]["ip"] == row["ip"]:
+                continue
+            deduped.append(row)
+        self._ip_log[:] = deduped[-IP_LOG_MAX_ROWS:]
+        await self._ip_log_store.async_save(self._ip_log)
+        if self.data is not None:
+            self.async_set_updated_data(
+                replace(self.data, ip_log=list(self._ip_log))
+            )
+        return len(self._ip_log)
+
     async def async_forget_device(self, mac: str) -> bool:
         """Drop a device from memory. An online device reappears next scan."""
         if self._memory is None:
@@ -386,6 +417,28 @@ def _new_device(
         "ha_area": None,
         "sources": sources,
     }
+
+
+def _read_ip_log_csv(path: str, config_dir: str) -> list[dict[str, str]]:
+    """Parse "date,ip" lines. Blocking — run in an executor."""
+    target = Path(path).resolve()
+    try:
+        target.relative_to(Path(config_dir).resolve())
+    except ValueError:
+        raise ValueError(
+            "Path must be inside the Home Assistant configuration directory"
+        ) from None
+    if not target.is_file():
+        raise FileNotFoundError(path)
+    rows: list[dict[str, str]] = []
+    for line in target.read_text(encoding="utf-8").splitlines():
+        date, _, ip = line.strip().partition(",")
+        date, ip = date.strip(), ip.strip()
+        if date and ip:
+            rows.append({"date": date, "ip": ip})
+    if not rows:
+        raise ValueError("No date,ip rows found in the file")
+    return rows
 
 
 def _compute_counts(devices: list[dict[str, Any]]) -> dict[str, int]:

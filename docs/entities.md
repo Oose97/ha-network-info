@@ -50,3 +50,4 @@ database.
 | Service | Fields | What it does |
 |---|---|---|
 | `network_info.forget_device` | `mac` (required) | Removes the device from the persistent memory. A device that is still on the network reappears on the next scan with fresh history; use this to prune stale offline rows. |
+| `network_info.import_ip_log` | `path` (required) | Imports external IP history from a CSV file (one `date,ip` pair per line) into the change log. Rows merge by date and consecutive duplicate IPs collapse, so it is safe to run twice. The file must live inside the HA configuration directory; requires IP change logging to be enabled. Returns the resulting row count. |

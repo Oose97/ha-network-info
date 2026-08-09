@@ -6,7 +6,12 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+)
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
@@ -16,6 +21,7 @@ from .cards import async_unregister as async_unregister_cards
 from .const import (
     DOMAIN,
     SERVICE_FORGET_DEVICE,
+    SERVICE_IMPORT_IP_LOG,
     STORAGE_VERSION,
     ip_log_storage_key,
     storage_key,
@@ -27,6 +33,7 @@ PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
 NetworkInfoConfigEntry = ConfigEntry[NetworkInfoCoordinator]
 
 FORGET_DEVICE_SCHEMA = vol.Schema({vol.Required("mac"): cv.string})
+IMPORT_IP_LOG_SCHEMA = vol.Schema({vol.Required("path"): cv.string})
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: NetworkInfoConfigEntry) -> bool:
@@ -60,6 +67,35 @@ def _async_register_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_FORGET_DEVICE, _handle_forget, schema=FORGET_DEVICE_SCHEMA
     )
 
+    async def _handle_import_ip_log(call: ServiceCall) -> ServiceResponse:
+        path = str(call.data["path"]).strip()
+        coordinators = [
+            entry.runtime_data
+            for entry in hass.config_entries.async_loaded_entries(DOMAIN)
+            if entry.runtime_data.ip_log_enabled
+        ]
+        if not coordinators:
+            raise ServiceValidationError(
+                "Enable external IP change logging in the integration options first"
+            )
+        totals: dict[str, int] = {}
+        for coordinator in coordinators:
+            try:
+                totals["rows"] = await coordinator.async_import_ip_log(path)
+            except FileNotFoundError:
+                raise ServiceValidationError(f"File not found: {path}") from None
+            except ValueError as err:
+                raise ServiceValidationError(str(err)) from None
+        return totals
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_IMPORT_IP_LOG,
+        _handle_import_ip_log,
+        schema=IMPORT_IP_LOG_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
 
 async def _async_update_listener(
     hass: HomeAssistant, entry: NetworkInfoConfigEntry
@@ -82,6 +118,7 @@ async def async_unload_entry(
         ]
         if not remaining:
             hass.services.async_remove(DOMAIN, SERVICE_FORGET_DEVICE)
+            hass.services.async_remove(DOMAIN, SERVICE_IMPORT_IP_LOG)
     return unloaded
 
 

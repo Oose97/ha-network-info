@@ -8,6 +8,7 @@ URL_CARDS = "/network-info-cards"
 
 STORAGE_VERSION = 1
 SERVICE_FORGET_DEVICE = "forget_device"
+SERVICE_IMPORT_IP_LOG = "import_ip_log"
 
 
 def storage_key(entry_id: str) -> str:
