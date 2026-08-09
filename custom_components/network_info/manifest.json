@@ -3,7 +3,7 @@
   "name": "Network Info",
   "codeowners": ["@Oose97"],
   "config_flow": true,
-  "dependencies": ["network"],
+  "dependencies": ["http", "network"],
   "documentation": "https://github.com/Oose97/ha-network-info",
   "integration_type": "hub",
   "iot_class": "local_polling",
