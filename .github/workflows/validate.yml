@@ -1,0 +1,79 @@
+name: Validate
+
+on:
+  push:
+    # Feature branches are validated by their pull_request runs; validating
+    # the push too would run everything twice per commit.
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+# A new commit supersedes the previous run of the same PR or branch; queued
+# or running validations of outdated code are cancelled rather than finished.
+concurrency:
+  group: validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+          # This is a custom repository, not one submitted to the HACS default
+          # store, so it is deliberately not registered in home-assistant/brands.
+          ignore: brands
+
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: home-assistant/actions/hassfest@master
+
+  # hassfest and HACS validate structure; this job proves the code actually
+  # imports against a real Home Assistant. Release triggers on this workflow
+  # succeeding, so a red job here blocks a release the same way a red
+  # hassfest does.
+  build:
+    name: Build & import
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Home Assistant and requirements
+        run: pip install --quiet homeassistant python-nmap
+
+      - name: Byte-compile the integration
+        run: python -m compileall -q custom_components
+
+      - name: Syntax-check the card
+        run: |
+          for f in custom_components/network_info/frontend/*.js; do
+            node --check "$f"
+          done
+
+      - name: Import the integration against Home Assistant
+        run: |
+          python -c "
+          import custom_components.network_info as pkg
+          import custom_components.network_info.config_flow
+          import custom_components.network_info.coordinator
+          import custom_components.network_info.scanner
+          import custom_components.network_info.sensor
+          import custom_components.network_info.button
+          import custom_components.network_info.entity
+          import custom_components.network_info.cards
+          import custom_components.network_info.router.xiaomi_miwifi
+          print('all modules import cleanly')
+          "

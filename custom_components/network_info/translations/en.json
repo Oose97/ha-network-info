@@ -1,0 +1,96 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Network Info",
+        "description": "Scans your network for all devices. Pick your router brand to also get each device's connection path (LAN, 2.4 GHz or 5 GHz Wi-Fi) — or leave it on None for scanning only.",
+        "data": {
+          "ip_range": "IP range(s) to scan",
+          "scan_interval": "Scan interval",
+          "router_brand": "Router brand",
+          "external_ip": "Track external IP",
+          "external_ip_log": "Log external IP changes"
+        },
+        "data_description": {
+          "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces. Pre-filled from Home Assistant's own network.",
+          "scan_interval": "How often to scan, in minutes.",
+          "router_brand": "Selecting a brand opens a second step with that brand's connection details pre-filled. None = no router polling; connection paths stay unknown.",
+          "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
+          "external_ip_log": "Keeps a persistent log of every external IP change. Requires “Track external IP” to be enabled. A log sensor holds the rows; its state is the row count."
+        }
+      },
+      "router": {
+        "title": "Router details",
+        "description": "Connection details for your {brand} router. The address is pre-filled with the brand's usual gateway — adjust it if yours differs.",
+        "data": {
+          "router_host": "Router address",
+          "router_username": "Router username",
+          "router_password": "Router admin password"
+        },
+        "data_description": {
+          "router_host": "IP address of the router on your network.",
+          "router_username": "The username the router's web UI expects.",
+          "router_password": "The router's admin (web UI) password."
+        }
+      }
+    },
+    "error": {
+      "invalid_ip_range": "Enter at least one IP range to scan.",
+      "invalid_host": "Enter the router address.",
+      "username_required": "This router brand needs a username.",
+      "password_required": "This router brand needs the admin password.",
+      "invalid_auth": "The router rejected the credentials.",
+      "cannot_connect": "Could not reach the router at this address.",
+      "unknown_brand": "This router brand is not available.",
+      "log_requires_tracking": "Enable “Track external IP” to log its changes."
+    },
+    "abort": {
+      "already_configured": "This IP range is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Network Info options",
+        "data": {
+          "ip_range": "IP range(s) to scan",
+          "scan_interval": "Scan interval",
+          "router_brand": "Router brand",
+          "external_ip": "Track external IP",
+          "external_ip_log": "Log external IP changes"
+        },
+        "data_description": {
+          "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces.",
+          "scan_interval": "How often to scan, in minutes.",
+          "router_brand": "Selecting a brand opens a second step with that brand's connection details. None = no router polling; connection paths stay unknown.",
+          "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
+          "external_ip_log": "Keeps a persistent log of every external IP change. Requires “Track external IP” to be enabled. A log sensor holds the rows; its state is the row count."
+        }
+      },
+      "router": {
+        "title": "Router details",
+        "description": "Connection details for your {brand} router.",
+        "data": {
+          "router_host": "Router address",
+          "router_username": "Router username",
+          "router_password": "Router admin password"
+        },
+        "data_description": {
+          "router_host": "IP address of the router on your network.",
+          "router_username": "The username the router's web UI expects.",
+          "router_password": "The router's admin (web UI) password."
+        }
+      }
+    },
+    "error": {
+      "invalid_ip_range": "Enter at least one IP range to scan.",
+      "invalid_host": "Enter the router address.",
+      "username_required": "This router brand needs a username.",
+      "password_required": "This router brand needs the admin password.",
+      "invalid_auth": "The router rejected the credentials.",
+      "cannot_connect": "Could not reach the router at this address.",
+      "unknown_brand": "This router brand is not available.",
+      "log_requires_tracking": "Enable “Track external IP” to log its changes."
+    }
+  }
+}
