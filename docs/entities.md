@@ -7,6 +7,8 @@ All entities live on one **Network Info** service device per config entry.
 | `sensor.network_info_devices` | Sensor | State = number of **online** devices. Attributes carry the full device list and the counters below. |
 | `sensor.network_info_home_assistant_ip` | Sensor (diagnostic) | Home Assistant's own local IP, detected via HA's network helper. |
 | `button.network_info_scan_now` | Button | Runs a full cycle (scan + router poll) immediately, outside the regular interval. |
+| `sensor.network_info_external_ip` | Sensor (opt-in) | The network's current public IP, fetched from `api.ipify.org` each cycle. Only created when external IP tracking (or logging) is enabled. |
+| `sensor.network_info_external_ip_log` | Sensor (opt-in) | External IP change history. State is the **row count** — a state increase is a clean automation trigger for "the IP changed". Rows live in the `log` attribute as `{date, ip}` pairs (newest last, capped at 500, excluded from the recorder). |
 
 ## The `devices` attribute
 

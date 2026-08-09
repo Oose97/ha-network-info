@@ -66,6 +66,35 @@ Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `sig
 - The footer shows filtered/total counts, online count, router reachability (when a
   router is configured but unreachable) and the last scan time.
 
+## Network Info IP Log
+
+<!-- screenshot: ![IP log](images/ip_log.png) -->
+
+Shows the external IP change history (requires **Log external IP changes** enabled in
+the integration). Minimal config:
+
+```yaml
+type: custom:network-info-ip-log
+```
+
+Full config:
+
+```yaml
+type: custom:network-info-ip-log
+entity: sensor.network_info_external_ip_log   # default
+title: External IP log                        # default
+page_size: 10                                 # initial page size: 10/25/50/100
+sort: date_desc                               # initial sort: date_desc | date_asc | ip_asc | ip_desc
+```
+
+- **Filter box** — matches date and IP.
+- **Click a header to sort** — dates chronologically, IPs numerically; the current
+  external IP's row renders bold.
+- **Pagination** — ‹ › controls with a row-range indicator in the footer.
+- **⚙ settings sheet** — default page size and default sort, persisted per browser
+  (localStorage). The YAML `page_size`/`sort` only set the initial state; **Reset**
+  returns to it.
+
 ## Alternatives
 
 The same data works with generic cards. With

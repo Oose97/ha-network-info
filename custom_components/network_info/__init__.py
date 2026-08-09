@@ -13,7 +13,13 @@ from homeassistant.helpers.storage import Store
 
 from .cards import async_register as async_register_cards
 from .cards import async_unregister as async_unregister_cards
-from .const import DOMAIN, SERVICE_FORGET_DEVICE, STORAGE_VERSION, storage_key
+from .const import (
+    DOMAIN,
+    SERVICE_FORGET_DEVICE,
+    STORAGE_VERSION,
+    ip_log_storage_key,
+    storage_key,
+)
 from .coordinator import NetworkInfoCoordinator
 
 PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
@@ -80,8 +86,9 @@ async def async_unload_entry(
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: NetworkInfoConfigEntry) -> None:
-    """Delete the entry's device memory and clean up Lovelace resources."""
-    store: Store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
-    await store.async_remove()
+    """Delete the entry's stored data and clean up Lovelace resources."""
+    for key in (storage_key(entry.entry_id), ip_log_storage_key(entry.entry_id)):
+        store: Store = Store(hass, STORAGE_VERSION, key)
+        await store.async_remove()
     if not hass.data.get(DOMAIN):
         await async_unregister_cards(hass)

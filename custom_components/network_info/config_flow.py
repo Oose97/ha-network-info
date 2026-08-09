@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -23,6 +24,8 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_EXTERNAL_IP,
+    CONF_EXTERNAL_IP_LOG,
     CONF_IP_RANGE,
     CONF_ROUTER_HOST,
     CONF_ROUTER_PASSWORD,
@@ -83,6 +86,13 @@ def _schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_ROUTER_PASSWORD, default=defaults.get(CONF_ROUTER_PASSWORD, "")
             ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            vol.Optional(
+                CONF_EXTERNAL_IP, default=bool(defaults.get(CONF_EXTERNAL_IP, False))
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_EXTERNAL_IP_LOG,
+                default=bool(defaults.get(CONF_EXTERNAL_IP_LOG, False)),
+            ): BooleanSelector(),
         }
     )
 
@@ -97,6 +107,8 @@ async def _async_check_input(
         CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
         CONF_ROUTER_HOST: (user_input.get(CONF_ROUTER_HOST) or "").strip(),
         CONF_ROUTER_PASSWORD: user_input.get(CONF_ROUTER_PASSWORD) or "",
+        CONF_EXTERNAL_IP: bool(user_input.get(CONF_EXTERNAL_IP)),
+        CONF_EXTERNAL_IP_LOG: bool(user_input.get(CONF_EXTERNAL_IP_LOG)),
     }
     if not data[CONF_IP_RANGE]:
         errors[CONF_IP_RANGE] = "invalid_ip_range"

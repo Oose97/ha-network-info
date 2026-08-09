@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
 from typing import Any
+
+from aiohttp import ClientError, ClientTimeout
 
 from homeassistant.components.network import async_get_source_ip
 from homeassistant.config_entries import ConfigEntry
@@ -19,6 +21,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_EXTERNAL_IP,
+    CONF_EXTERNAL_IP_LOG,
     CONF_IP_RANGE,
     CONF_ROUTER_HOST,
     CONF_ROUTER_PASSWORD,
@@ -28,7 +32,10 @@ from .const import (
     CONNECTION_UNKNOWN,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
+    EXTERNAL_IP_URL,
+    IP_LOG_MAX_ROWS,
     STORAGE_VERSION,
+    ip_log_storage_key,
     storage_key,
 )
 from .router import RouterAuthError, RouterClient, RouterError, RouterProvider
@@ -48,6 +55,8 @@ class NetworkData:
     router_available: bool | None = None  # None = no router configured
     router_model: str | None = None
     last_scan: datetime | None = None
+    external_ip: str | None = None  # None = tracking disabled or not yet known
+    ip_log: list[dict[str, str]] | None = None  # None = logging disabled
 
 
 class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
@@ -82,6 +91,17 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             hass, STORAGE_VERSION, storage_key(entry.entry_id)
         )
         self._memory: dict[str, dict[str, Any]] | None = None
+        # External IP tracking (opt-in). Logging implies tracking.
+        self._log_external_ip = bool(config.get(CONF_EXTERNAL_IP_LOG))
+        self._track_external_ip = (
+            bool(config.get(CONF_EXTERNAL_IP)) or self._log_external_ip
+        )
+        self._ip_log_store: Store[list[dict[str, str]]] = Store(
+            hass, STORAGE_VERSION, ip_log_storage_key(entry.entry_id)
+        )
+        self._ip_log: list[dict[str, str]] | None = None
+        self._external_ip: str | None = None
+        self._ip_warned = False
 
     async def _async_update_data(self) -> NetworkData:
         if self._memory is None:
@@ -135,6 +155,9 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         except HomeAssistantError:
             ha_ip = None
 
+        if self._track_external_ip:
+            await self._async_update_external_ip()
+
         return NetworkData(
             devices=devices,
             counts=counts,
@@ -142,7 +165,46 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             router_available=router_available,
             router_model=self._provider.model if self._provider else None,
             last_scan=dt_util.utcnow(),
+            external_ip=self._external_ip if self._track_external_ip else None,
+            ip_log=list(self._ip_log or []) if self._log_external_ip else None,
         )
+
+    async def _async_update_external_ip(self) -> None:
+        """Fetch the public IP and append to the change log when it moved."""
+        if self._ip_log is None:
+            self._ip_log = await self._ip_log_store.async_load() or []
+
+        try:
+            resp = await async_get_clientsession(self.hass).get(
+                EXTERNAL_IP_URL, timeout=ClientTimeout(total=15)
+            )
+            resp.raise_for_status()
+            payload = await resp.json(content_type=None)
+            external_ip = str(payload.get("ip") or "").strip() or None
+        except (ClientError, TimeoutError, ValueError) as err:
+            if not self._ip_warned:
+                self._ip_warned = True
+                _LOGGER.warning("External IP lookup failed: %s", err)
+            return  # keep the last known value
+        if self._ip_warned:
+            self._ip_warned = False
+            _LOGGER.info("External IP lookup recovered")
+        if external_ip is None:
+            return
+
+        self._external_ip = external_ip
+        if not self._log_external_ip:
+            return
+        last = self._ip_log[-1]["ip"] if self._ip_log else None
+        if external_ip != last:
+            self._ip_log.append(
+                {
+                    "date": dt_util.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "ip": external_ip,
+                }
+            )
+            del self._ip_log[:-IP_LOG_MAX_ROWS]
+            self._ip_log_store.async_delay_save(lambda: self._ip_log, 5)
 
     def _merge(
         self,
@@ -266,14 +328,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 if (d.get("mac") or f"ip:{d.get('ip')}") != key
             ]
             self.async_set_updated_data(
-                NetworkData(
-                    devices=devices,
-                    counts=_compute_counts(devices),
-                    ha_ip=self.data.ha_ip,
-                    router_available=self.data.router_available,
-                    router_model=self.data.router_model,
-                    last_scan=self.data.last_scan,
-                )
+                replace(self.data, devices=devices, counts=_compute_counts(devices))
             )
         return True
 

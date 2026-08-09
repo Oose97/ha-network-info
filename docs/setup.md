@@ -27,6 +27,8 @@ becomes the scan range and `.1` on that subnet is suggested as the router addres
 | Scan interval | Minutes between automatic scans. Default 15, allowed 1–1440. A `/24` ping sweep takes a few seconds, so short intervals are harmless. |
 | Router address (optional) | The router's IP. Only needed for connection-path and signal information. |
 | Router admin password (optional) | The router's web-UI admin password. Leave empty for scan-only mode. |
+| Track external IP | Fetches the network's public IP from `api.ipify.org` each scan cycle and publishes it as a sensor. This is the integration's **only** internet call, and only when enabled. |
+| Log external IP changes | Keeps a persistent log of every external IP change (implies tracking). The log survives restarts and is capped at the newest 500 entries. |
 
 When a password is entered it is verified against the router before the entry is
 created:

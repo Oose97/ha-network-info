@@ -8,13 +8,17 @@
           "ip_range": "IP range(s) to scan",
           "scan_interval": "Scan interval",
           "router_host": "Router address (optional)",
-          "router_password": "Router admin password (optional)"
+          "router_password": "Router admin password (optional)",
+          "external_ip": "Track external IP",
+          "external_ip_log": "Log external IP changes"
         },
         "data_description": {
           "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces. Pre-filled from Home Assistant's own network.",
           "scan_interval": "How often to scan, in minutes.",
           "router_host": "IP address of your Xiaomi/MiWiFi router. Needed only for connection-path and signal information.",
-          "router_password": "The router's admin (web UI) password. Leave empty to skip router polling."
+          "router_password": "The router's admin (web UI) password. Leave empty to skip router polling.",
+          "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
+          "external_ip_log": "Keeps a persistent log of every external IP change (implies tracking). A log sensor holds the rows; its state is the row count."
         }
       }
     },
@@ -36,13 +40,17 @@
           "ip_range": "IP range(s) to scan",
           "scan_interval": "Scan interval",
           "router_host": "Router address (optional)",
-          "router_password": "Router admin password (optional)"
+          "router_password": "Router admin password (optional)",
+          "external_ip": "Track external IP",
+          "external_ip_log": "Log external IP changes"
         },
         "data_description": {
           "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces.",
           "scan_interval": "How often to scan, in minutes.",
           "router_host": "IP address of your Xiaomi/MiWiFi router. Needed only for connection-path and signal information.",
-          "router_password": "The router's admin (web UI) password. Leave empty to disable router polling."
+          "router_password": "The router's admin (web UI) password. Leave empty to disable router polling.",
+          "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
+          "external_ip_log": "Keeps a persistent log of every external IP change (implies tracking). A log sensor holds the rows; its state is the row count."
         }
       }
     },

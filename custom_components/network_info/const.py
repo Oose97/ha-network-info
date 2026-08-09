@@ -18,6 +18,12 @@ CONF_IP_RANGE = "ip_range"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ROUTER_HOST = "router_host"
 CONF_ROUTER_PASSWORD = "router_password"
+CONF_EXTERNAL_IP = "external_ip"
+CONF_EXTERNAL_IP_LOG = "external_ip_log"
+
+# The integration's only internet call, and only when the user opted in.
+EXTERNAL_IP_URL = "https://api.ipify.org/?format=json"
+IP_LOG_MAX_ROWS = 500
 
 DEFAULT_SCAN_INTERVAL_MINUTES = 15
 MIN_SCAN_INTERVAL_MINUTES = 1
@@ -49,3 +55,9 @@ ATTR_HA_IP = "ha_ip"
 ATTR_ROUTER_AVAILABLE = "router_available"
 ATTR_ROUTER_MODEL = "router_model"
 ATTR_LAST_SCAN = "last_scan"
+ATTR_IP_LOG = "log"
+
+
+def ip_log_storage_key(entry_id: str) -> str:
+    """Location of the per-entry external IP log in .storage."""
+    return f"{DOMAIN}.{entry_id}_ip_log"

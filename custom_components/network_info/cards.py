@@ -23,7 +23,7 @@ from .const import DOMAIN, URL_CARDS
 
 _LOGGER = logging.getLogger(__name__)
 
-CARD_FILES = ("network-info-table.js",)
+CARD_FILES = ("network-info-table.js", "network-info-ip-log.js")
 
 _PATHS_DONE = f"{DOMAIN}_static_paths"
 RETRY_SECONDS = 5

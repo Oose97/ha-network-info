@@ -14,9 +14,12 @@ from .const import (
     ATTR_COUNTS,
     ATTR_DEVICES,
     ATTR_HA_IP,
+    ATTR_IP_LOG,
     ATTR_LAST_SCAN,
     ATTR_ROUTER_AVAILABLE,
     ATTR_ROUTER_MODEL,
+    CONF_EXTERNAL_IP,
+    CONF_EXTERNAL_IP_LOG,
 )
 from .coordinator import NetworkInfoCoordinator
 from .entity import NetworkInfoEntity
@@ -29,12 +32,16 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Network Info sensors."""
     coordinator = entry.runtime_data
-    async_add_entities(
-        [
-            NetworkDevicesSensor(coordinator, entry),
-            HomeAssistantIpSensor(coordinator, entry),
-        ]
-    )
+    config = {**entry.data, **entry.options}
+    entities: list[SensorEntity] = [
+        NetworkDevicesSensor(coordinator, entry),
+        HomeAssistantIpSensor(coordinator, entry),
+    ]
+    if config.get(CONF_EXTERNAL_IP) or config.get(CONF_EXTERNAL_IP_LOG):
+        entities.append(ExternalIpSensor(coordinator, entry))
+    if config.get(CONF_EXTERNAL_IP_LOG):
+        entities.append(ExternalIpLogSensor(coordinator, entry))
+    async_add_entities(entities)
 
 
 class NetworkDevicesSensor(NetworkInfoEntity, SensorEntity):
@@ -72,6 +79,53 @@ class NetworkDevicesSensor(NetworkInfoEntity, SensorEntity):
             ATTR_HA_IP: data.ha_ip,
             ATTR_LAST_SCAN: data.last_scan.isoformat() if data.last_scan else None,
         }
+
+
+class ExternalIpSensor(NetworkInfoEntity, SensorEntity):
+    """The network's current public IP (opt-in)."""
+
+    _attr_name = "External IP"
+    _attr_icon = "mdi:wan"
+
+    def __init__(
+        self, coordinator: NetworkInfoCoordinator, entry: NetworkInfoConfigEntry
+    ) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_external_ip"
+
+    @property
+    def native_value(self) -> str | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.external_ip
+
+
+class ExternalIpLogSensor(NetworkInfoEntity, SensorEntity):
+    """Change log of the public IP. State is the row count, so a state
+    increase is a clean automation trigger for "the IP changed"."""
+
+    _attr_name = "External IP log"
+    _attr_icon = "mdi:ip-network-outline"
+    _unrecorded_attributes = frozenset({ATTR_IP_LOG})
+
+    def __init__(
+        self, coordinator: NetworkInfoCoordinator, entry: NetworkInfoConfigEntry
+    ) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_external_ip_log"
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return len(self.coordinator.data.ip_log or [])
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data = self.coordinator.data
+        if data is None:
+            return {}
+        return {ATTR_IP_LOG: data.ip_log or []}
 
 
 class HomeAssistantIpSensor(NetworkInfoEntity, SensorEntity):

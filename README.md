@@ -24,10 +24,13 @@ device also gets its connection path, signal level and the router's name for it.
 - **Knows your Home Assistant**: discovered devices are matched against the HA device
   registry, so they show up with their HA names and areas; HA's own IP is detected and
   pre-fills the whole setup form.
-- **A table card included** — filterable, sortable, per-browser column settings,
-  optional grouping into 2.4 GHz / 5 GHz / LAN sections, and a refresh button that
-  triggers a scan on demand. Registered as a dashboard resource automatically
-  ([details](docs/cards.md)).
+- **Cards included** — a device table (filterable, sortable, per-browser column
+  settings, optional grouping into 2.4 GHz / 5 GHz / LAN sections, scan-on-demand) and
+  an external IP log table (filterable, sortable, paginated). Registered as dashboard
+  resources automatically ([details](docs/cards.md)).
+- **External IP tracking, opt-in** — the public IP as a sensor and a persistent change
+  log with timestamps; `api.ipify.org` is the integration's only internet call, made
+  only when enabled ([details](docs/entities.md)).
 - **No configuration homework** — add the integration, accept the pre-filled subnet,
   done. The router password is optional and everything degrades cleanly without it.
 
@@ -68,6 +71,8 @@ Go to [Entities & services](docs/entities.md) for more details.
   per-path counters — bulky attributes stay out of the recorder.
 - A diagnostic sensor with HA's own local IP, and a **Scan now** button for immediate
   rescans from the UI or automations.
+- Opt-in external IP sensor and change-log sensor — the log's state is its row count,
+  so "the count went up" is a clean IP-changed trigger.
 - A `forget_device` service to prune stale entries from the device memory.
 
 ### Scanning & memory
@@ -99,6 +104,8 @@ Go to [Cards](docs/cards.md) for more details.
   hidden, ↻ scan-on-demand.
 - Grouping into 2.4 GHz / 5 GHz / LAN sections — offered only when the integration has
   router access, disabled with a hint otherwise.
+- **Network Info IP Log** — the external IP change history: filterable, sortable,
+  paginated, with default page size and sort in its settings sheet.
 
 ### Releasing
 
