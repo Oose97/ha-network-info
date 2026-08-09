@@ -6,6 +6,14 @@ DOMAIN = "network_info"
 
 URL_CARDS = "/network-info-cards"
 
+STORAGE_VERSION = 1
+SERVICE_FORGET_DEVICE = "forget_device"
+
+
+def storage_key(entry_id: str) -> str:
+    """Location of the per-entry seen-device memory in .storage."""
+    return f"{DOMAIN}.{entry_id}"
+
 CONF_IP_RANGE = "ip_range"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ROUTER_HOST = "router_host"

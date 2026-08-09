@@ -24,6 +24,8 @@ const COLUMNS = {
   ha_device: { label: "HA device" },
   ha_area: { label: "Area" },
   router_name: { label: "Router name" },
+  first_seen: { label: "First seen", date: true },
+  last_seen: { label: "Last seen", date: true },
   sources: { label: "Seen by" },
 };
 
@@ -150,6 +152,11 @@ class NetworkInfoTable extends HTMLElement {
 
   _cmp(a, b, key) {
     if (key === "ip") return ipNum(a.ip) - ipNum(b.ip);
+    if (COLUMNS[key] && COLUMNS[key].date) {
+      const x = a[key] ? Date.parse(a[key]) : -Infinity;
+      const y = b[key] ? Date.parse(b[key]) : -Infinity;
+      return x - y;
+    }
     if (key === "signal") {
       const x = a.signal == null ? -Infinity : Number(a.signal);
       const y = b.signal == null ? -Infinity : Number(b.signal);
@@ -339,6 +346,12 @@ class NetworkInfoTable extends HTMLElement {
             : `<td><span class="dot offd">○</span></td>`;
         case "sources":
           return `<td>${esc((d.sources || []).join(", "))}</td>`;
+        case "first_seen":
+        case "last_seen": {
+          if (!d[c]) return "<td></td>";
+          const t = new Date(d[c]);
+          return `<td>${isNaN(t) ? "" : esc(t.toLocaleString([], { dateStyle: "short", timeStyle: "short" }))}</td>`;
+        }
         default:
           return `<td>${esc(d[c])}</td>`;
       }

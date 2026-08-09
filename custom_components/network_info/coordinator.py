@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import area_registry as ar, device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -26,6 +27,8 @@ from .const import (
     CONNECTION_UNKNOWN,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
+    STORAGE_VERSION,
+    storage_key,
 )
 from .router import RouterAuthError, RouterClient, RouterError, RouterProvider
 from .router.xiaomi_miwifi import XiaomiMiWiFiProvider
@@ -68,8 +71,18 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 router_host, router_password, async_get_clientsession(hass)
             )
         self._router_warned = False
+        # Every device ever seen, keyed by MAC (ip:<ip> before the MAC is
+        # known). This is the integration's own memory — offline devices stay
+        # listed even in scan-only mode; the router only enriches it.
+        self._store: Store[dict[str, dict[str, Any]]] = Store(
+            hass, STORAGE_VERSION, storage_key(entry.entry_id)
+        )
+        self._memory: dict[str, dict[str, Any]] | None = None
 
     async def _async_update_data(self) -> NetworkData:
+        if self._memory is None:
+            self._memory = await self._store.async_load() or {}
+
         try:
             scanned = await self.hass.async_add_executor_job(
                 scan_network, self._ip_range
@@ -102,17 +115,11 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                     )
 
         devices = self._merge(scanned, router_clients)
+        self._apply_memory(devices)
         self._enrich_from_registries(devices)
         devices.sort(key=_ip_sort_key)
 
-        counts = {"total": len(devices), "online": 0}
-        for slug in CONNECTION_SLUGS.values():
-            counts[slug] = 0
-        for device in devices:
-            if device["online"]:
-                counts["online"] += 1
-                slug = CONNECTION_SLUGS.get(device["connection"], "unknown")
-                counts[slug] += 1
+        counts = _compute_counts(devices)
 
         try:
             ha_ip = await async_get_source_ip(self.hass)
@@ -177,6 +184,90 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
 
         return list(merged.values())
 
+    def _apply_memory(self, devices: list[dict[str, Any]]) -> None:
+        """Fold this cycle into the persistent memory, and the memory into it.
+
+        Live devices update their memory record (first/last seen, last known
+        facts); remembered devices absent from this cycle are appended as
+        offline rows so they never silently vanish — regardless of whether a
+        router is configured.
+        """
+        assert self._memory is not None
+        memory = self._memory
+        now_iso = dt_util.utcnow().isoformat()
+        live_keys: set[str] = set()
+
+        for dev in devices:
+            key = dev["mac"] or f"ip:{dev['ip']}"
+            live_keys.add(key)
+            rec = memory.get(key)
+            if rec is None and dev["mac"] and dev["ip"]:
+                # Stored before its MAC was known — migrate the IP-keyed record.
+                rec = memory.pop(f"ip:{dev['ip']}", None)
+                if rec is not None:
+                    memory[key] = rec
+            if rec is None:
+                rec = {"first_seen": now_iso}
+                memory[key] = rec
+            for field in ("ip", "mac", "hostname", "vendor", "router_name"):
+                if dev.get(field):
+                    rec[field] = dev[field]
+            if dev["connection"] != CONNECTION_UNKNOWN:
+                rec["connection"] = dev["connection"]
+            elif rec.get("connection"):
+                # Scan-only cycle: keep showing the last path the router knew.
+                dev["connection"] = rec["connection"]
+            if dev["online"]:
+                rec["last_seen"] = now_iso
+            dev["first_seen"] = rec["first_seen"]
+            dev["last_seen"] = rec.get("last_seen")
+
+        for key, rec in memory.items():
+            if key in live_keys:
+                continue
+            dev = _new_device(
+                ip=rec.get("ip"),
+                mac=rec.get("mac"),
+                hostname=rec.get("hostname"),
+                vendor=rec.get("vendor"),
+                online=False,
+                sources=["memory"],
+            )
+            dev["router_name"] = rec.get("router_name")
+            if rec.get("connection"):
+                dev["connection"] = rec["connection"]
+            dev["first_seen"] = rec.get("first_seen")
+            dev["last_seen"] = rec.get("last_seen")
+            devices.append(dev)
+
+        self._store.async_delay_save(lambda: memory, 30)
+
+    async def async_forget_device(self, mac: str) -> bool:
+        """Drop a device from memory. An online device reappears next scan."""
+        if self._memory is None:
+            return False
+        key = mac.strip().lower().replace("-", ":")
+        if self._memory.pop(key, None) is None:
+            return False
+        await self._store.async_save(self._memory)
+        if self.data is not None:
+            devices = [
+                d
+                for d in self.data.devices
+                if (d.get("mac") or f"ip:{d.get('ip')}") != key
+            ]
+            self.async_set_updated_data(
+                NetworkData(
+                    devices=devices,
+                    counts=_compute_counts(devices),
+                    ha_ip=self.data.ha_ip,
+                    router_available=self.data.router_available,
+                    router_model=self.data.router_model,
+                    last_scan=self.data.last_scan,
+                )
+            )
+        return True
+
     def _enrich_from_registries(self, devices: list[dict[str, Any]]) -> None:
         """Attach Home Assistant device names and areas by MAC."""
         dev_reg = dr.async_get(self.hass)
@@ -231,6 +322,20 @@ def _new_device(
         "ha_area": None,
         "sources": sources,
     }
+
+
+def _compute_counts(devices: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {"total": len(devices), "online": 0, "offline": 0}
+    for slug in CONNECTION_SLUGS.values():
+        counts[slug] = 0
+    for device in devices:
+        if device["online"]:
+            counts["online"] += 1
+            slug = CONNECTION_SLUGS.get(device["connection"], "unknown")
+            counts[slug] += 1
+        else:
+            counts["offline"] += 1
+    return counts
 
 
 def _ip_sort_key(device: dict[str, Any]) -> tuple[int, int]:

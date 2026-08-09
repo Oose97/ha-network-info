@@ -12,6 +12,7 @@ Inspired by [network_scanner](https://github.com/parvez/network_scanner), rebuil
 
 - Periodic nmap scan of one or more IP ranges (CIDR, dash ranges, space-separated)
 - Union of scan results and the router's client list — devices that block ping are still found via the router, and wired-but-silent devices via the scan
+- **Persistent device memory**: every device ever seen is remembered (with first/last-seen timestamps) and stays listed as offline when it disappears — surviving restarts and working in scan-only mode. Router access enriches the memory (adds devices, updates names and paths); the last known connection path is kept when the router is not being polled. Stale entries are removed with the `network_info.forget_device` service.
 - Per device: IP, MAC, best-known name, hostname, vendor, connection path, Wi-Fi signal, online state, HA device name and area
 - Per-path counters (LAN / 2.4 GHz / 5 GHz / guest / unknown)
 - `sensor.network_info_devices` — online device count with the full device list as attributes (excluded from the recorder to keep the database small)
@@ -66,7 +67,15 @@ Each entry in the `devices` attribute of `sensor.network_info_devices`:
 | `router_name` | `MyPhone` | router |
 | `ha_device` | `Living Room TV` | HA device registry |
 | `ha_area` | `Living Room` | HA area registry |
-| `sources` | `["scan", "router"]` | which sources saw the device |
+| `first_seen` | `2026-08-09T07:00:00+00:00` | integration memory |
+| `last_seen` | `2026-08-09T09:15:00+00:00` | integration memory (last time seen online) |
+| `sources` | `["scan", "router"]` | which sources saw the device this cycle (`memory` = remembered, currently absent) |
+
+## Services
+
+| Service | What it does |
+|---|---|
+| `network_info.forget_device` | Removes a device (by MAC) from the persistent memory. A device that is still on the network reappears on the next scan with fresh history. |
 
 ## The bundled card
 
@@ -93,7 +102,7 @@ columns:                              # initial visible columns + order (optiona
   - online
 ```
 
-Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `signal`, `online`, `ha_device`, `ha_area`, `router_name`, `sources`.
+Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `signal`, `online`, `ha_device`, `ha_area`, `router_name`, `first_seen`, `last_seen`, `sources`.
 
 Card features:
 

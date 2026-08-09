@@ -1,0 +1,14 @@
+forget_device:
+  name: Forget device
+  description: >-
+    Remove a device from the integration's persistent memory of seen devices.
+    If the device is still on the network it reappears on the next scan with a
+    fresh history; use this to clean up stale offline entries.
+  fields:
+    mac:
+      name: MAC address
+      description: MAC address of the device to forget.
+      required: true
+      example: "aa:bb:cc:dd:ee:ff"
+      selector:
+        text:
