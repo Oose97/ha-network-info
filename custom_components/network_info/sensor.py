@@ -125,7 +125,8 @@ class ExternalIpLogSensor(NetworkInfoEntity, SensorEntity):
         data = self.coordinator.data
         if data is None:
             return {}
-        return {ATTR_IP_LOG: data.ip_log or []}
+        # The current IP rides along so the log card can mark it standalone.
+        return {ATTR_IP_LOG: data.ip_log or [], "external_ip": data.external_ip}
 
 
 class HomeAssistantIpSensor(NetworkInfoEntity, SensorEntity):

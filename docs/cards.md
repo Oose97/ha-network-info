@@ -88,8 +88,10 @@ sort: date_desc                               # initial sort: date_desc | date_a
 ```
 
 - **Filter box** — matches date and IP.
-- **Click a header to sort** — dates chronologically, IPs numerically; the current
-  external IP's row renders bold.
+- **Click a header to sort** — dates chronologically, IPs numerically.
+- **Current IP highlighted** — rows matching the IP in use right now get a green
+  tint (including earlier stints on the same IP), and the newest row carries a
+  "current" pill.
 - **Pagination** — ‹ › controls with a row-range indicator in the footer.
 - **⚙ settings sheet** — default page size and default sort, persisted per browser
   (localStorage). The YAML `page_size`/`sort` only set the initial state; **Reset**

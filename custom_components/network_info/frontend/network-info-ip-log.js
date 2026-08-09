@@ -148,7 +148,12 @@ class NetworkInfoIpLog extends HTMLElement {
           .nil td { padding: 5px 10px 5px 0; white-space: nowrap;
             font-family: ui-monospace, monospace; font-size: 0.95em;
             border-bottom: 1px solid color-mix(in srgb, var(--divider-color, #444) 40%, transparent); }
-          .nil tr.latest td { font-weight: 600; }
+          .nil tr.current td { font-weight: 600;
+            background: rgba(76, 175, 80, 0.10); }
+          .nil .cur-pill { display: inline-block; margin-left: 8px; padding: 0 8px;
+            border-radius: 10px; font-size: 0.82em; font-weight: 500;
+            font-family: var(--paper-font-body1_-_font-family, inherit);
+            background: rgba(76, 175, 80, 0.22); color: #81c784; }
           .nil-foot { display: flex; align-items: center; gap: 10px; padding: 8px 0 4px;
             color: var(--secondary-text-color); font-size: 0.85em; }
           .nil-foot .info { margin-right: auto; }
@@ -252,21 +257,28 @@ class NetworkInfoIpLog extends HTMLElement {
       "</tr>";
 
     const rows = this._rows();
-    const all = ((st.attributes && st.attributes.log) || []).length;
+    const log = (st.attributes && st.attributes.log) || [];
+    const all = log.length;
     const size = this._settings.pageSize;
     const pages = Math.max(1, Math.ceil(rows.length / size));
     this._page = Math.min(Math.max(this._page, 0), pages - 1);
     const start = this._page * size;
     const slice = rows.slice(start, start + size);
-    const latest = all
-      ? st.attributes.log[st.attributes.log.length - 1]
-      : null;
+    // The IP in use right now; the newest log row is the fallback for the
+    // moments between a change landing in the log and the sensor updating.
+    const currentIp =
+      (st.attributes && st.attributes.external_ip) ||
+      (all ? log[all - 1].ip : null);
+    const newest = all ? log[all - 1] : null;
 
     this._els.tbody.innerHTML = slice.length
       ? slice
           .map((r) => {
-            const isLatest = latest && r.date === latest.date && r.ip === latest.ip;
-            return `<tr${isLatest ? ' class="latest"' : ""}><td>${escIp(r.date)}</td><td>${escIp(r.ip)}</td></tr>`;
+            const isCurrent = currentIp && r.ip === currentIp;
+            const isNewest = newest && r.date === newest.date && r.ip === newest.ip;
+            const pill = isCurrent && isNewest
+              ? '<span class="cur-pill">current</span>' : "";
+            return `<tr${isCurrent ? ' class="current"' : ""}><td>${escIp(r.date)}</td><td>${escIp(r.ip)}${pill}</td></tr>`;
           })
           .join("")
       : `<tr><td colspan="2">No entries</td></tr>`;
