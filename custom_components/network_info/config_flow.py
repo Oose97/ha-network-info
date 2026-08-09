@@ -107,9 +107,11 @@ async def _async_check_input(
             await _async_validate_router(
                 hass, data[CONF_ROUTER_HOST], data[CONF_ROUTER_PASSWORD]
             )
-        except RouterAuthError:
+        except RouterAuthError as err:
+            _LOGGER.warning("Router rejected the credentials: %s", err)
             errors[CONF_ROUTER_PASSWORD] = "invalid_auth"
-        except RouterError:
+        except RouterError as err:
+            _LOGGER.warning("Router validation failed: %s", err)
             errors[CONF_ROUTER_HOST] = "cannot_connect"
     return data, errors
 

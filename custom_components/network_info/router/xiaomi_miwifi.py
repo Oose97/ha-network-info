@@ -67,20 +67,52 @@ class XiaomiMiWiFiProvider(RouterProvider):
         # Arbitrary stable device id used in the login nonce.
         self._device_id = "".join(random.choices("0123456789ABCDEF", k=12))
 
-    async def _get_json(self, url: str) -> dict[str, Any]:
-        try:
-            resp = await self._session.get(url, timeout=_TIMEOUT)
-            resp.raise_for_status()
-            data = await resp.json(content_type=None)
-        except (ClientError, TimeoutError, ValueError) as err:
-            raise RouterConnectionError(f"Request to router failed: {err}") from err
-        if not isinstance(data, dict):
-            raise RouterConnectionError("Router returned an unexpected payload")
-        return data
+    async def _request_json(
+        self, method: str, path: str, data: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        """Request an API path, following the firmware's HTTP→HTTPS upgrade.
+
+        Newer MiWiFi firmwares (seen on mesh AX models) answer GETs over plain
+        HTTP but 301 the login POST to HTTPS with a self-signed certificate.
+        aiohttp would follow that redirect as a GET and drop the body, so
+        redirects are handled here: upgrade the base to https once and retry
+        the same request. Certificate verification is off — the router's cert
+        is self-signed and the target is a LAN address the user configured.
+        """
+        for attempt in (0, 1):
+            url = f"{self._base}{path}"
+            try:
+                resp = await self._session.request(
+                    method,
+                    url,
+                    data=data,
+                    timeout=_TIMEOUT,
+                    ssl=False,
+                    allow_redirects=False,
+                )
+                if resp.status in (301, 302, 307, 308):
+                    location = resp.headers.get("Location", "")
+                    if location.startswith("https://") and attempt == 0:
+                        self._base = "https://" + self._base.split("://", 1)[1]
+                        continue
+                    raise RouterConnectionError(
+                        f"Router redirected {path} to unexpected location {location!r}"
+                    )
+                resp.raise_for_status()
+                payload = await resp.json(content_type=None)
+            except (ClientError, TimeoutError, ValueError) as err:
+                raise RouterConnectionError(f"Request to router failed: {err}") from err
+            if not isinstance(payload, dict):
+                raise RouterConnectionError("Router returned an unexpected payload")
+            return payload
+        raise RouterConnectionError("Router kept redirecting")  # pragma: no cover
+
+    async def _get_json(self, path: str) -> dict[str, Any]:
+        return await self._request_json("GET", path)
 
     async def async_login(self) -> None:
         """Authenticate and store the stok token."""
-        init = await self._get_json(f"{self._base}/cgi-bin/luci/api/xqsystem/init_info")
+        init = await self._get_json("/cgi-bin/luci/api/xqsystem/init_info")
         self._new_encrypt = str(init.get("newEncryptMode", 0)) == "1"
         self.model = init.get("hardware") or init.get("model") or None
 
@@ -89,24 +121,19 @@ class XiaomiMiWiFiProvider(RouterProvider):
         first = digest((self._password + _LOGIN_KEY).encode()).hexdigest()
         password_hash = digest((nonce + first).encode()).hexdigest()
 
-        try:
-            resp = await self._session.post(
-                f"{self._base}/cgi-bin/luci/api/xqsystem/login",
-                data={
-                    "username": "admin",
-                    "password": password_hash,
-                    "logtype": "2",
-                    "nonce": nonce,
-                },
-                timeout=_TIMEOUT,
-            )
-            data = await resp.json(content_type=None)
-        except (ClientError, TimeoutError, ValueError) as err:
-            raise RouterConnectionError(f"Login request failed: {err}") from err
+        data = await self._request_json(
+            "POST",
+            "/cgi-bin/luci/api/xqsystem/login",
+            data={
+                "username": "admin",
+                "password": password_hash,
+                "logtype": "2",
+                "nonce": nonce,
+            },
+        )
 
-        if not isinstance(data, dict) or data.get("code") != 0 or not data.get("token"):
-            code = data.get("code") if isinstance(data, dict) else "?"
-            raise RouterAuthError(f"Router rejected login (code {code})")
+        if data.get("code") != 0 or not data.get("token"):
+            raise RouterAuthError(f"Router rejected login (code {data.get('code')})")
         self._token = data["token"]
         _LOGGER.debug("Logged in to MiWiFi router (model %s)", self.model)
 
@@ -114,13 +141,11 @@ class XiaomiMiWiFiProvider(RouterProvider):
         """Call an authenticated API endpoint, re-logging in once on stale token."""
         if self._token is None:
             await self.async_login()
-        data = await self._get_json(f"{self._base}/cgi-bin/luci/;stok={self._token}/api/{path}")
+        data = await self._get_json(f"/cgi-bin/luci/;stok={self._token}/api/{path}")
         if data.get("code") != 0:
             self._token = None
             await self.async_login()
-            data = await self._get_json(
-                f"{self._base}/cgi-bin/luci/;stok={self._token}/api/{path}"
-            )
+            data = await self._get_json(f"/cgi-bin/luci/;stok={self._token}/api/{path}")
             if data.get("code") != 0:
                 raise RouterConnectionError(f"API {path} returned code {data.get('code')}")
         return data
