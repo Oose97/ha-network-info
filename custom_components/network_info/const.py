@@ -43,6 +43,14 @@ CONNECTION_GUEST = "Guest"
 CONNECTION_WIFI = "Wi-Fi"
 CONNECTION_UNKNOWN = "Unknown"
 
+# The wireless paths, for telling a Wi-Fi→LAN transition from a stale flag.
+WIFI_CONNECTIONS = (
+    CONNECTION_WIFI_24,
+    CONNECTION_WIFI_5,
+    CONNECTION_GUEST,
+    CONNECTION_WIFI,
+)
+
 # Slugs used for the per-path counters in sensor attributes.
 CONNECTION_SLUGS = {
     CONNECTION_ROUTER: "router",

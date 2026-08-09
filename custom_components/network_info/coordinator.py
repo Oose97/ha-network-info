@@ -35,12 +35,14 @@ from .const import (
     CONNECTION_ROUTER,
     CONNECTION_SLUGS,
     CONNECTION_UNKNOWN,
+    CONNECTION_LAN,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
     EXTERNAL_IP_URL,
     IP_LOG_MAX_ROWS,
     ROUTER_BRAND_NONE,
     STORAGE_VERSION,
+    WIFI_CONNECTIONS,
     ip_log_storage_key,
     storage_key,
 )
@@ -306,6 +308,18 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             for field in ("ip", "mac", "hostname", "vendor", "router_name"):
                 if dev.get(field):
                     rec[field] = dev[field]
+            if (
+                dev["connection"] == CONNECTION_LAN
+                and "scan" not in dev["sources"]
+                and rec.get("connection") in WIFI_CONNECTIONS
+            ):
+                # Router-claimed "online, wired" on a device the scan cannot
+                # see, right after it was on Wi-Fi: the router's device list
+                # keeps a stale online flag for a while after a wireless
+                # client disassociates. A genuinely wired device always
+                # answers the ARP sweep, so this is the flag, not a
+                # re-cabling — keep the last known band.
+                dev["connection"] = rec["connection"]
             if dev["connection"] != CONNECTION_UNKNOWN:
                 rec["connection"] = dev["connection"]
             elif rec.get("connection"):
