@@ -1,175 +1,166 @@
-# Network Info for Home Assistant
+# Network Info
 
-A Home Assistant custom integration that discovers **every device on your network** and enriches each one with as much detail as possible — including **which network path it uses: LAN, 2.4 GHz or 5 GHz Wi-Fi**.
+A Home Assistant integration that discovers **every device on your network** — not just
+the ones Home Assistant knows — remembers everything it has ever seen, and shows which
+path each device uses: **LAN, 2.4 GHz or 5 GHz Wi-Fi**. Ships its own table card.
 
-Inspired by [network_scanner](https://github.com/parvez/network_scanner), rebuilt around three ideas:
+Scanning works with zero credentials; give it your router's admin password and every
+device also gets its connection path, signal level and the router's name for it.
 
-1. **Brand-independent discovery.** An nmap ping sweep finds every responding device (IP, MAC, vendor, hostname) — no router required.
-2. **Pluggable router providers.** Connection path (LAN / 2.4 GHz / 5 GHz / guest) and signal strength only exist inside your router, so a small brand-specific provider fetches them. The provider is an isolated module behind a common interface — currently Xiaomi MiWiFi is implemented; other brands can be added without touching the core.
-3. **Home Assistant awareness.** Discovered MACs are matched against HA's device registry, so devices HA already knows show up with their HA name and area. The integration also detects Home Assistant's own local IP automatically and uses it to pre-fill the scan range.
+<!-- hero screenshot: ![The device table card](docs/images/device_table.png) -->
 
-## Features
+## Highlights
 
-- Periodic nmap scan of one or more IP ranges (CIDR, dash ranges, space-separated)
-- Union of scan results and the router's client list — devices that block ping are still found via the router, and wired-but-silent devices via the scan
-- **Persistent device memory**: every device ever seen is remembered (with first/last-seen timestamps) and stays listed as offline when it disappears — surviving restarts and working in scan-only mode. Router access enriches the memory (adds devices, updates names and paths); the last known connection path is kept when the router is not being polled. Stale entries are removed with the `network_info.forget_device` service.
-- Per device: IP, MAC, best-known name, hostname, vendor, connection path, Wi-Fi signal, online state, HA device name and area
-- Per-path counters (LAN / 2.4 GHz / 5 GHz / guest / unknown)
-- `sensor.network_info_devices` — online device count with the full device list as attributes (excluded from the recorder to keep the database small)
-- `sensor.network_info_home_assistant_ip` — HA's own local IP (diagnostic)
-- `button.network_info_scan_now` — trigger an immediate scan outside the regular interval (also usable from automations); the bundled card has a matching ↻ toolbar button
-- Optional router polling: add your router's address and admin password in the config flow; leave empty for scan-only mode
-- All settings changeable later via the integration's **Configure** dialog
-- Bundled **Network Info Table** Lovelace card — filterable, sortable, configurable columns, optional grouping into 2.4 GHz / 5 GHz / LAN sections (registered as a dashboard resource automatically)
+- **Finds everything**: an nmap sweep of your subnet unioned with the router's client
+  list — devices that block ping are still found via the router, silent wired devices
+  via the scan ([details](docs/scanning.md)).
+- **Connection path per device** — LAN / 2.4 GHz / 5 GHz / guest, plus signal level,
+  read from the router's own API. Router brands are pluggable providers behind one
+  interface; Xiaomi MiWiFi is implemented ([details](docs/routers.md)).
+- **The integration owns the memory**: every device ever seen is stored with first- and
+  last-seen timestamps and stays listed when it goes offline — surviving restarts and
+  working identically in scan-only mode. The router only enriches the list
+  ([details](docs/scanning.md#device-memory)).
+- **Knows your Home Assistant**: discovered devices are matched against the HA device
+  registry, so they show up with their HA names and areas; HA's own IP is detected and
+  pre-fills the whole setup form.
+- **A table card included** — filterable, sortable, per-browser column settings,
+  optional grouping into 2.4 GHz / 5 GHz / LAN sections, and a refresh button that
+  triggers a scan on demand. Registered as a dashboard resource automatically
+  ([details](docs/cards.md)).
+- **No configuration homework** — add the integration, accept the pre-filled subnet,
+  done. The router password is optional and everything degrades cleanly without it.
 
-## Requirements
+## Install
 
-- The `nmap` executable (bundled with Home Assistant OS / Container images)
-- For connection-path info: a Xiaomi/MiWiFi router (tested with AX series) and its admin password
+**HACS** → three-dot menu → _Custom repositories_ → add
+`https://github.com/Oose97/ha-network-info` as an **Integration**, then download it and
+restart Home Assistant.
 
-## Installation
+**Manually**: copy `custom_components/network_info` into your `config/custom_components/`
+and restart.
 
-### HACS (custom repository)
+Then _Settings → Devices & Services → Add Integration → Network Info_. The scan range
+and router address come pre-filled — see [Setup](docs/setup.md).
 
-1. HACS → three-dot menu → **Custom repositories**
-2. Add this repository URL, category **Integration**
-3. Install **Network Info**, restart Home Assistant
+Requires Home Assistant 2024.12+ and the `nmap` executable (bundled with Home Assistant
+OS and Container images). Connection-path info needs a supported router — currently
+Xiaomi/MiWiFi — and its admin password.
 
-### Manual
+## Documentation
 
-1. Copy `custom_components/network_info` into your HA `custom_components` directory
-2. Restart Home Assistant
+### Setup
 
-## Configuration
+Go to [Setup](docs/setup.md) for more details.
 
-Settings → Devices & Services → **Add Integration** → **Network Info**
+- The form is pre-filled from Home Assistant's own network: subnet as the scan range,
+  `.1` as the router address. Multiple ranges and multiple entries are supported.
+- The router password is optional — leave it empty for scan-only mode. When set, it is
+  verified against the router before the entry is created.
+- Everything (range, interval, router credentials) is changeable later via Configure.
 
-| Field | Meaning |
-|---|---|
-| IP range(s) to scan | Pre-filled from HA's own network, e.g. `192.168.1.0/24`. Multiple ranges separated by spaces are allowed. |
-| Scan interval | Minutes between scans (default 15). |
-| Router address (optional) | Your Xiaomi/MiWiFi router IP, e.g. `192.168.1.1`. |
-| Router admin password (optional) | The router web UI password. Leave empty to skip router polling — everything works except connection path and signal. |
+### Entities & services
 
-## Device attributes
+Go to [Entities & services](docs/entities.md) for more details.
 
-Each entry in the `devices` attribute of `sensor.network_info_devices`:
+- A devices sensor whose state is the online count and whose attributes carry the full
+  per-device list (IP, MAC, name, vendor, path, signal, first/last seen, …) plus
+  per-path counters — bulky attributes stay out of the recorder.
+- A diagnostic sensor with HA's own local IP, and a **Scan now** button for immediate
+  rescans from the UI or automations.
+- A `forget_device` service to prune stale entries from the device memory.
 
-| Key | Example | Source |
-|---|---|---|
-| `ip` | `192.168.1.23` | scan / router |
-| `mac` | `aa:bb:cc:dd:ee:ff` | scan / router |
-| `name` | `Living Room TV` | best of: HA name → router name → hostname → vendor |
-| `hostname` | `tv-livingroom.lan` | reverse DNS |
-| `vendor` | `TP-Link Systems Inc.` | MAC OUI |
-| `connection` | `2.4 GHz`, `5 GHz`, `LAN`, `Guest`, `Unknown` | router |
-| `signal` | `58` | router |
-| `online` | `true` | scan / router |
-| `router_name` | `MyPhone` | router |
-| `ha_device` | `Living Room TV` | HA device registry |
-| `ha_area` | `Living Room` | HA area registry |
-| `first_seen` | `2026-08-09T07:00:00+00:00` | integration memory |
-| `last_seen` | `2026-08-09T09:15:00+00:00` | integration memory (last time seen online) |
-| `sources` | `["scan", "router"]` | which sources saw the device this cycle (`memory` = remembered, currently absent) |
+### Scanning & memory
 
-## Services
+Go to [Scanning & memory](docs/scanning.md) for more details.
 
-| Service | What it does |
-|---|---|
-| `network_info.forget_device` | Removes a device (by MAC) from the persistent memory. A device that is still on the network reappears on the next scan with fresh history. |
+- Each cycle: nmap ping sweep → router client poll → merge by MAC → fold into the
+  persistent memory → enrich with HA registry names.
+- Devices absent from a cycle are served from memory as offline rows; the last known
+  connection path is kept when the router is not being polled.
+- Names resolve HA name → router name → hostname → vendor, first match wins.
 
-## The bundled card
+### Router providers
 
-The integration ships its own table card and registers it as a Lovelace resource automatically (storage-mode dashboards; YAML-mode users get the resource URL logged at startup). Minimal config:
+Go to [Router providers](docs/routers.md) for more details.
 
-```yaml
-type: custom:network-info-table
-```
+- Which band a device is on only exists inside the access point — no scan can see it,
+  so a small brand-specific provider asks the router.
+- Providers implement one interface (`async_get_clients`, keyed by MAC); the rest of
+  the integration is brand-agnostic. Xiaomi MiWiFi ships first; adding a brand is one
+  module.
 
-Full config:
+### Cards
 
-```yaml
-type: custom:network-info-table
-entity: sensor.network_info_devices   # default
-title: Network devices                # default
-max_height: 70vh                      # table scroll bound, default
-columns:                              # initial visible columns + order (optional)
-  - name
-  - ip
-  - mac
-  - connection
-  - signal
-  - ha_area
-  - online
-```
+Go to [Cards](docs/cards.md) for more details.
 
-Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `signal`, `online`, `ha_device`, `ha_area`, `router_name`, `first_seen`, `last_seen`, `sources`.
+- **Network Info Table** — filter box, click-to-sort headers (IPs sort numerically),
+  settings sheet with per-browser column visibility and order, offline rows dimmed or
+  hidden, ↻ scan-on-demand.
+- Grouping into 2.4 GHz / 5 GHz / LAN sections — offered only when the integration has
+  router access, disabled with a hint otherwise.
 
-Card features:
+### Releasing
 
-- **Filter box** — matches against every field (name, IP, MAC, vendor, area, …)
-- **↻ refresh** — triggers an immediate scan when the list feels stale (the regular interval keeps running)
-- **Click a header to sort**; IPs sort numerically
-- **⚙ settings sheet** — show/hide and reorder columns, per browser (localStorage)
-- **Group into 2.4 GHz / 5 GHz / LAN tables** — renders one section per connection path with device counts. This option only appears when the integration has router access; without the router admin password there is no path information, and the toggle is shown disabled with a hint.
-- **Show/hide offline devices** — devices the router remembers but that are not currently connected render dimmed, or can be hidden entirely
-- Footer with filtered/total counts, online count, router reachability and last scan time
+Go to [Releasing](docs/releasing.md) for more details.
 
-## Alternative: generic cards
+- The version lives in `manifest.json`; a release is cut automatically once Validate
+  passes on `main`.
 
-Using [flex-table-card](https://github.com/custom-cards/flex-table-card):
+## Automations
+
+The devices sensor holds the **online count** as state and the full list plus totals as
+attributes, so "the total went up" is the signal that a brand-new device appeared.
+
+**Notify when a never-seen device joins the network:**
 
 ```yaml
-type: custom:flex-table-card
-title: Network Devices
-entities:
-  include: sensor.network_info_devices
-columns:
-  - name: Name
-    data: devices
-    modify: x.name
-  - name: IP
-    data: devices
-    modify: x.ip
-  - name: MAC
-    data: devices
-    modify: x.mac
-  - name: Path
-    data: devices
-    modify: x.connection
-  - name: Signal
-    data: devices
-    modify: x.signal ?? ""
-  - name: Area
-    data: devices
-    modify: x.ha_area ?? ""
+alias: "Network: new device joined"
+triggers:
+  - trigger: state
+    entity_id: sensor.network_info_devices
+    not_from: ["unknown", "unavailable"]
+    not_to: ["unknown", "unavailable"]
+conditions:
+  - condition: template
+    value_template: >-
+      {{ (trigger.to_state.attributes.counts.total | int(0)) >
+         (trigger.from_state.attributes.counts.total | int(0)) }}
+actions:
+  - variables:
+      newest: >-
+        {{ trigger.to_state.attributes.devices
+           | sort(attribute='first_seen') | last }}
+  - action: notify.notify
+    data:
+      title: New device on the network
+      message: "{{ newest.name }} ({{ newest.ip }}) via {{ newest.connection }}"
+mode: single
 ```
 
-Or with a core markdown card:
+**Scan immediately when someone arrives home:**
 
 ```yaml
-type: markdown
-content: >
-  | Name | IP | Path | Area |
-  |------|----|------|------|
-  {% for d in state_attr('sensor.network_info_devices', 'devices') -%}
-  | {{ d.name }} | {{ d.ip }} | {{ d.connection }} | {{ d.ha_area or '' }} |
-  {% endfor %}
+alias: "Network: scan on arrival"
+triggers:
+  - trigger: state
+    entity_id: person.example
+    to: "home"
+actions:
+  - action: button.press
+    target:
+      entity_id: button.network_info_scan_now
+mode: single
 ```
 
-## How connection-path detection works
+## Not part of the integration
 
-Which band a device is associated to only exists inside the access point — no scan can see it. The Xiaomi provider logs into the router's local web API and reads its client list (`devicelist` + `wifi_connect_devices`), which reports per client whether it is wired or on the 2.4 GHz / 5 GHz / guest network, plus signal level. Devices connected to a different AP or switch segment appear with path `Unknown`.
-
-## Releases
-
-`main` is protected; work lands via pull requests. The **Release** workflow tags and releases automatically from the `manifest.json` version once **Validate** (HACS + hassfest + build/import checks) passes on `main` — the manifest is the single source of truth for the version.
-
-## Roadmap
-
-- Router brand selection in the config flow (the provider interface already supports it)
-- Per-device tracker entities / presence detection
-- Deeper enrichment (mDNS, UPnP, NetBIOS names)
+- **A dashboard.** The card is provided — where it goes is yours to decide.
+- **Presence detection.** The device list tells you what is on the network, but it does
+  not create `device_tracker` entities yet — that is on the roadmap, not in the box.
+- **Path info without router access.** Which band a device uses simply does not exist
+  outside the access point; without a supported router and its password the path column
+  reads Unknown, and that is honest rather than guessed.
 
 ## License
 
