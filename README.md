@@ -7,7 +7,7 @@ path each device uses: **LAN, 2.4 GHz or 5 GHz Wi-Fi**. Ships its own table card
 Scanning works with zero credentials; give it your router's admin password and every
 device also gets its connection path, signal level and the router's name for it.
 
-<!-- hero screenshot: ![The device table card](docs/images/device_table.png) -->
+![The device table card: every device with its path, signal, HA name and history](docs/images/network_devices_full_table_with_router_api.jpg)
 
 ## Highlights
 

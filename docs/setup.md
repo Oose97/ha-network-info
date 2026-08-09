@@ -16,7 +16,7 @@ Container images; Core/venv installs may need it installed on the host.
 
 _Settings → Devices & Services → Add Integration → Network Info._
 
-<!-- screenshot: ![Config flow](images/config_flow.png) -->
+![The basics step — the same form serves setup and the later Configure dialog](images/configuration_1.jpg)
 
 Setup is two steps. The first covers the basics, pre-filled from Home Assistant's own
 network connection:

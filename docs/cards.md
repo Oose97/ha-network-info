@@ -7,7 +7,7 @@ query on the resource.
 
 ## Network Info Table
 
-<!-- screenshot: ![Device table](images/device_table.png) -->
+![The device table with router access — paths, signal and history per device](images/network_devices_full_table_with_router_api.jpg)
 
 Minimal config:
 
@@ -43,9 +43,14 @@ Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `sig
   arrives. The regular interval keeps running regardless.
 - **⚙ Table settings** — opens the settings sheet.
 
+In scan-only mode (no router brand configured) the same table works with the
+path/signal columns empty:
+
+![The device table in scan-only mode](images/network_devices_full_table_no_router_api.jpg)
+
 ### Settings sheet
 
-<!-- screenshot: ![Settings sheet](images/table_settings.png) -->
+![The settings sheet](images/network_devices_table_settings.jpg)
 
 - **Group into 2.4 GHz / 5 GHz / LAN tables** — renders one section per connection
   path, each with a badge and device count. Only offered when the integration has
@@ -62,13 +67,17 @@ Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `sig
 
 - Click a column header to sort; click again to flip direction. IPs sort numerically,
   signal and the seen-timestamps sort by value.
-- Offline rows are dimmed. `first seen` / `last seen` render in the browser's locale.
+- Offline rows are dimmed — devices the integration remembers but that are currently
+  absent (`Seen by: memory`). `first seen` / `last seen` render in the browser's
+  locale.
+
+![An offline device kept from the integration's memory](images/network_devices_offline_device.jpg)
 - The footer shows filtered/total counts, online count, router reachability (when a
   router is configured but unreachable) and the last scan time.
 
 ## Network Info IP Log
 
-<!-- screenshot: ![IP log](images/ip_log.png) -->
+![The external IP log card](images/ip_log_masked.jpg)
 
 Shows the external IP change history (requires **Log external IP changes** enabled in
 the integration). Minimal config:
@@ -96,6 +105,8 @@ sort: date_desc                               # initial sort: date_desc | date_a
 - **⚙ settings sheet** — default page size and default sort, persisted per browser
   (localStorage). The YAML `page_size`/`sort` only set the initial state; **Reset**
   returns to it.
+
+![The IP log settings sheet](images/ip_log_table_settings.jpg)
 
 ## Alternatives
 
