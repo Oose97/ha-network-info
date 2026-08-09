@@ -1,0 +1,61 @@
+# Cuts a release when the manifest version changes on main.
+#
+# Triggered by Validate finishing rather than by the push itself, so a commit
+# that fails hassfest or HACS never becomes a release. The version is read from
+# manifest.json rather than bumped here: the manifest is what Home Assistant
+# and HACS actually read, so it stays the single source of truth and the tag
+# follows it.
+name: Release
+
+on:
+  workflow_run:
+    workflows: [Validate]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag and release
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # workflow_run runs against the default branch, so check out the
+          # commit that was actually validated.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Read the manifest version
+        id: manifest
+        run: |
+          version="$(jq -r .version custom_components/network_info/manifest.json)"
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::manifest.json has no version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null 2>&1; then
+            echo "::notice::v$version is already released; nothing to do"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the release
+        if: steps.manifest.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+        run: |
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes \
+            --target "$(git rev-parse HEAD)"
+          echo "::notice::Released v${VERSION}"

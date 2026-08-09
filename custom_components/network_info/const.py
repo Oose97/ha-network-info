@@ -4,6 +4,8 @@ from __future__ import annotations
 
 DOMAIN = "network_info"
 
+URL_CARDS = "/network-info-cards"
+
 CONF_IP_RANGE = "ip_range"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_ROUTER_HOST = "router_host"

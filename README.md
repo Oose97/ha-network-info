@@ -18,6 +18,7 @@ Inspired by [network_scanner](https://github.com/parvez/network_scanner), rebuil
 - `sensor.network_info_home_assistant_ip` — HA's own local IP (diagnostic)
 - Optional router polling: add your router's address and admin password in the config flow; leave empty for scan-only mode
 - All settings changeable later via the integration's **Configure** dialog
+- Bundled **Network Info Table** Lovelace card — filterable, sortable, configurable columns, optional grouping into 2.4 GHz / 5 GHz / LAN sections (registered as a dashboard resource automatically)
 
 ## Requirements
 
@@ -67,7 +68,43 @@ Each entry in the `devices` attribute of `sensor.network_info_devices`:
 | `ha_area` | `Living Room` | HA area registry |
 | `sources` | `["scan", "router"]` | which sources saw the device |
 
-## Dashboard example
+## The bundled card
+
+The integration ships its own table card and registers it as a Lovelace resource automatically (storage-mode dashboards; YAML-mode users get the resource URL logged at startup). Minimal config:
+
+```yaml
+type: custom:network-info-table
+```
+
+Full config:
+
+```yaml
+type: custom:network-info-table
+entity: sensor.network_info_devices   # default
+title: Network devices                # default
+max_height: 70vh                      # table scroll bound, default
+columns:                              # initial visible columns + order (optional)
+  - name
+  - ip
+  - mac
+  - connection
+  - signal
+  - ha_area
+  - online
+```
+
+Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `signal`, `online`, `ha_device`, `ha_area`, `router_name`, `sources`.
+
+Card features:
+
+- **Filter box** — matches against every field (name, IP, MAC, vendor, area, …)
+- **Click a header to sort**; IPs sort numerically
+- **⚙ settings sheet** — show/hide and reorder columns, per browser (localStorage)
+- **Group into 2.4 GHz / 5 GHz / LAN tables** — renders one section per connection path with device counts. This option only appears when the integration has router access; without the router admin password there is no path information, and the toggle is shown disabled with a hint.
+- **Show/hide offline devices** — devices the router remembers but that are not currently connected render dimmed, or can be hidden entirely
+- Footer with filtered/total counts, online count, router reachability and last scan time
+
+## Alternative: generic cards
 
 Using [flex-table-card](https://github.com/custom-cards/flex-table-card):
 
@@ -112,6 +149,10 @@ content: >
 ## How connection-path detection works
 
 Which band a device is associated to only exists inside the access point — no scan can see it. The Xiaomi provider logs into the router's local web API and reads its client list (`devicelist` + `wifi_connect_devices`), which reports per client whether it is wired or on the 2.4 GHz / 5 GHz / guest network, plus signal level. Devices connected to a different AP or switch segment appear with path `Unknown`.
+
+## Releases
+
+`main` is protected; work lands via pull requests. The **Release** workflow tags and releases automatically from the `manifest.json` version once **Validate** (HACS + hassfest + build/import checks) passes on `main` — the manifest is the single source of truth for the version.
 
 ## Roadmap
 
