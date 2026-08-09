@@ -56,11 +56,12 @@ Xiaomi/MiWiFi — and its admin password.
 
 Go to [Setup](docs/setup.md) for more details.
 
-- The form is pre-filled from Home Assistant's own network: subnet as the scan range,
-  `.1` as the router address. Multiple ranges and multiple entries are supported.
-- The router password is optional — leave it empty for scan-only mode. When set, it is
-  verified against the router before the entry is created.
-- Everything (range, interval, router credentials) is changeable later via Configure.
+- Two steps: the basics (scan range pre-filled from HA's own network, interval, router
+  brand, external IP toggles), then router details when a brand is picked — pre-filled
+  from the catalog, credentials verified before the entry is created.
+- Router brand defaults to **None (scanning only)**; multiple ranges and multiple
+  entries are supported.
+- Everything (range, interval, brand, credentials) is changeable later via Configure.
 
 ### Entities & services
 
@@ -91,9 +92,12 @@ Go to [Router providers](docs/routers.md) for more details.
 
 - Which band a device is on only exists inside the access point — no scan can see it,
   so a small brand-specific provider asks the router.
+- The setup dropdown is driven by a brand catalog (`routers.json`): each entry carries
+  the brand's default gateway, HTTPS default and which credentials it needs, so the
+  router step comes pre-filled and only asks for what the brand requires.
 - Providers implement one interface (`async_get_clients`, keyed by MAC); the rest of
   the integration is brand-agnostic. Xiaomi MiWiFi ships first; adding a brand is one
-  module.
+  module plus one catalog entry.
 
 ### Cards
 

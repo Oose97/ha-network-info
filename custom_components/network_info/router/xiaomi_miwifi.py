@@ -54,11 +54,20 @@ _WIFI_INDEX_CONNECTION = {
 class XiaomiMiWiFiProvider(RouterProvider):
     """Router provider for Xiaomi MiWiFi firmware."""
 
-    def __init__(self, host: str, password: str, session: ClientSession) -> None:
+    def __init__(
+        self,
+        host: str,
+        password: str,
+        session: ClientSession,
+        username: str = "admin",
+        use_https: bool = False,
+    ) -> None:
         host = host.strip()
         if not host.startswith(("http://", "https://")):
-            host = f"http://{host}"
+            scheme = "https" if use_https else "http"
+            host = f"{scheme}://{host}"
         self._base = host.rstrip("/")
+        self._username = (username or "admin").strip() or "admin"
         self._password = password
         self._session = session
         self._token: str | None = None
@@ -76,8 +85,11 @@ class XiaomiMiWiFiProvider(RouterProvider):
         HTTP but 301 the login POST to HTTPS with a self-signed certificate.
         aiohttp would follow that redirect as a GET and drop the body, so
         redirects are handled here: upgrade the base to https once and retry
-        the same request. Certificate verification is off — the router's cert
-        is self-signed and the target is a LAN address the user configured.
+        the same request. The opposite direction is covered too — when the
+        default is HTTPS but an older firmware has no TLS listener, one retry
+        drops back to HTTP. Certificate verification is off — the router's
+        cert is self-signed and the target is a LAN address the user
+        configured.
         """
         for attempt in (0, 1):
             url = f"{self._base}{path}"
@@ -90,6 +102,12 @@ class XiaomiMiWiFiProvider(RouterProvider):
                     ssl=False,
                     allow_redirects=False,
                 )
+            except (ClientError, TimeoutError) as err:
+                if attempt == 0 and self._base.startswith("https://"):
+                    self._base = "http://" + self._base.split("://", 1)[1]
+                    continue
+                raise RouterConnectionError(f"Request to router failed: {err}") from err
+            try:
                 if resp.status in (301, 302, 307, 308):
                     location = resp.headers.get("Location", "")
                     if location.startswith("https://") and attempt == 0:
@@ -125,7 +143,7 @@ class XiaomiMiWiFiProvider(RouterProvider):
             "POST",
             "/cgi-bin/luci/api/xqsystem/login",
             data={
-                "username": "admin",
+                "username": self._username,
                 "password": password_hash,
                 "logtype": "2",
                 "nonce": nonce,

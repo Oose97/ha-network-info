@@ -25,8 +25,11 @@ from .const import (
     CONF_EXTERNAL_IP,
     CONF_EXTERNAL_IP_LOG,
     CONF_IP_RANGE,
+    CONF_ROUTER_BRAND,
     CONF_ROUTER_HOST,
     CONF_ROUTER_PASSWORD,
+    CONF_ROUTER_USE_HTTPS,
+    CONF_ROUTER_USERNAME,
     CONF_SCAN_INTERVAL,
     CONNECTION_ROUTER,
     CONNECTION_SLUGS,
@@ -35,12 +38,18 @@ from .const import (
     DOMAIN,
     EXTERNAL_IP_URL,
     IP_LOG_MAX_ROWS,
+    ROUTER_BRAND_NONE,
     STORAGE_VERSION,
     ip_log_storage_key,
     storage_key,
 )
-from .router import RouterAuthError, RouterClient, RouterError, RouterProvider
-from .router.xiaomi_miwifi import XiaomiMiWiFiProvider
+from .router import (
+    RouterAuthError,
+    RouterClient,
+    RouterError,
+    RouterProvider,
+    create_provider,
+)
 from .scanner import ScannedDevice, ScannerError, scan_network
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,13 +86,25 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         self._provider: RouterProvider | None = None
         router_host = (config.get(CONF_ROUTER_HOST) or "").strip()
         router_password = config.get(CONF_ROUTER_PASSWORD) or ""
+        brand = config.get(CONF_ROUTER_BRAND)
+        if brand is None:
+            # Entries created before the brand catalog carried host+password
+            # only; those were always Xiaomi MiWiFi.
+            brand = "xiaomi_miwifi" if router_host and router_password else ROUTER_BRAND_NONE
         # The device at this address IS the router — known from config even
-        # without a password, so it can be labeled regardless of API access.
+        # without API access, so it can be labeled regardless.
         self._router_ip = router_host.split("://")[-1].split("/")[0].split(":")[0]
-        if router_host and router_password:
-            self._provider = XiaomiMiWiFiProvider(
-                router_host, router_password, async_get_clientsession(hass)
+        if brand != ROUTER_BRAND_NONE and router_host:
+            self._provider = create_provider(
+                brand,
+                router_host,
+                (config.get(CONF_ROUTER_USERNAME) or "").strip(),
+                router_password,
+                async_get_clientsession(hass),
+                bool(config.get(CONF_ROUTER_USE_HTTPS)),
             )
+            if self._provider is None:
+                _LOGGER.warning("Unknown router brand %r — running scan-only", brand)
         self._router_warned = False
         # Every device ever seen, keyed by MAC (ip:<ip> before the MAC is
         # known). This is the integration's own memory — offline devices stay

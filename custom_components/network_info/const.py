@@ -17,8 +17,12 @@ def storage_key(entry_id: str) -> str:
 
 CONF_IP_RANGE = "ip_range"
 CONF_SCAN_INTERVAL = "scan_interval"
+CONF_ROUTER_BRAND = "router_brand"
 CONF_ROUTER_HOST = "router_host"
+CONF_ROUTER_USERNAME = "router_username"
 CONF_ROUTER_PASSWORD = "router_password"
+CONF_ROUTER_USE_HTTPS = "router_https"
+ROUTER_BRAND_NONE = "none"
 CONF_EXTERNAL_IP = "external_ip"
 CONF_EXTERNAL_IP_LOG = "external_ip_log"
 

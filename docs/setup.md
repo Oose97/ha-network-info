@@ -18,29 +18,35 @@ _Settings → Devices & Services → Add Integration → Network Info._
 
 <!-- screenshot: ![Config flow](images/config_flow.png) -->
 
-The form comes pre-filled from Home Assistant's own network connection: the subnet
-becomes the scan range and `.1` on that subnet is suggested as the router address.
+Setup is two steps. The first covers the basics, pre-filled from Home Assistant's own
+network connection:
 
 | Field | Meaning |
 |---|---|
 | IP range(s) to scan | Anything nmap accepts: CIDR (`192.168.1.0/24`), dash ranges (`192.168.1.1-254`), or several ranges separated by spaces. |
 | Scan interval | Minutes between automatic scans. Default 15, allowed 1–1440. A `/24` ping sweep takes a few seconds, so short intervals are harmless. |
-| Router address (optional) | The router's IP. Only needed for connection-path and signal information. |
-| Router admin password (optional) | The router's web-UI admin password. Leave empty for scan-only mode. |
+| Router brand | **None (scanning only)** by default. Pick your router's brand to get per-device connection paths and signal — the supported brands come from the [router catalog](routers.md#the-brand-catalog). |
 | Track external IP | Fetches the network's public IP from `api.ipify.org` each scan cycle and publishes it as a sensor. This is the integration's **only** internet call, and only when enabled. |
 | Log external IP changes | Keeps a persistent log of every external IP change (implies tracking). The log survives restarts and is capped at the newest 500 entries. |
 
-When a password is entered it is verified against the router before the entry is
-created:
+Choosing a brand opens the second step, pre-filled from the catalog. Only the fields
+that brand actually needs are shown:
+
+| Field | Meaning |
+|---|---|
+| Router address | Pre-filled with the brand's usual gateway address; adjust if yours differs. |
+| Router username | Only shown for brands that need one. |
+| Router admin password | Only shown for brands that need one. |
+
+The credentials are verified against the router before the entry is created:
 
 | Error | Meaning |
 |---|---|
-| _Enter the router address to use the router password_ | Password given but no address. |
-| _The router rejected the admin password_ | Login reached the router and was refused. |
+| _The router rejected the credentials_ | Login reached the router and was refused. |
 | _Could not reach the router at this address_ | Nothing answered the API there. |
 
-Scan-only mode (no password) still discovers, remembers and names devices — only the
-path/signal columns stay empty until router access is added.
+Scan-only mode (brand None) still discovers, remembers and names devices — only the
+path/signal columns stay empty until a router brand is configured.
 
 ## Changing settings later
 

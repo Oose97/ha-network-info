@@ -1,0 +1,13 @@
+{
+  "routers": [
+    {
+      "id": "xiaomi_miwifi",
+      "name": "Xiaomi / MiWiFi",
+      "default_gateway": "192.168.31.1",
+      "requires_username": false,
+      "requires_password": true,
+      "default_https": true,
+      "api_endpoint": "{gateway}/cgi-bin/luci/api"
+    }
+  ]
+}

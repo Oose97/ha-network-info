@@ -3,30 +3,45 @@
     "step": {
       "user": {
         "title": "Network Info",
-        "description": "Scans your network for all devices and, when router access is configured, shows which path each device uses (LAN, 2.4 GHz or 5 GHz Wi-Fi). Leave the router fields empty to use scanning only.",
+        "description": "Scans your network for all devices. Pick your router brand to also get each device's connection path (LAN, 2.4 GHz or 5 GHz Wi-Fi) — or leave it on None for scanning only.",
         "data": {
           "ip_range": "IP range(s) to scan",
           "scan_interval": "Scan interval",
-          "router_host": "Router address (optional)",
-          "router_password": "Router admin password (optional)",
+          "router_brand": "Router brand",
           "external_ip": "Track external IP",
           "external_ip_log": "Log external IP changes"
         },
         "data_description": {
           "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces. Pre-filled from Home Assistant's own network.",
           "scan_interval": "How often to scan, in minutes.",
-          "router_host": "IP address of your Xiaomi/MiWiFi router. Needed only for connection-path and signal information.",
-          "router_password": "The router's admin (web UI) password. Leave empty to skip router polling.",
+          "router_brand": "Selecting a brand opens a second step with that brand's connection details pre-filled. None = no router polling; connection paths stay unknown.",
           "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
           "external_ip_log": "Keeps a persistent log of every external IP change (implies tracking). A log sensor holds the rows; its state is the row count."
+        }
+      },
+      "router": {
+        "title": "Router details",
+        "description": "Connection details for your {brand} router. The address is pre-filled with the brand's usual gateway — adjust it if yours differs.",
+        "data": {
+          "router_host": "Router address",
+          "router_username": "Router username",
+          "router_password": "Router admin password"
+        },
+        "data_description": {
+          "router_host": "IP address of the router on your network.",
+          "router_username": "The username the router's web UI expects.",
+          "router_password": "The router's admin (web UI) password."
         }
       }
     },
     "error": {
       "invalid_ip_range": "Enter at least one IP range to scan.",
-      "password_without_host": "Enter the router address to use the router password.",
-      "invalid_auth": "The router rejected the admin password.",
-      "cannot_connect": "Could not reach the router at this address."
+      "invalid_host": "Enter the router address.",
+      "username_required": "This router brand needs a username.",
+      "password_required": "This router brand needs the admin password.",
+      "invalid_auth": "The router rejected the credentials.",
+      "cannot_connect": "Could not reach the router at this address.",
+      "unknown_brand": "This router brand is not available."
     },
     "abort": {
       "already_configured": "This IP range is already configured."
@@ -39,26 +54,41 @@
         "data": {
           "ip_range": "IP range(s) to scan",
           "scan_interval": "Scan interval",
-          "router_host": "Router address (optional)",
-          "router_password": "Router admin password (optional)",
+          "router_brand": "Router brand",
           "external_ip": "Track external IP",
           "external_ip_log": "Log external IP changes"
         },
         "data_description": {
           "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces.",
           "scan_interval": "How often to scan, in minutes.",
-          "router_host": "IP address of your Xiaomi/MiWiFi router. Needed only for connection-path and signal information.",
-          "router_password": "The router's admin (web UI) password. Leave empty to disable router polling.",
+          "router_brand": "Selecting a brand opens a second step with that brand's connection details. None = no router polling; connection paths stay unknown.",
           "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
           "external_ip_log": "Keeps a persistent log of every external IP change (implies tracking). A log sensor holds the rows; its state is the row count."
+        }
+      },
+      "router": {
+        "title": "Router details",
+        "description": "Connection details for your {brand} router.",
+        "data": {
+          "router_host": "Router address",
+          "router_username": "Router username",
+          "router_password": "Router admin password"
+        },
+        "data_description": {
+          "router_host": "IP address of the router on your network.",
+          "router_username": "The username the router's web UI expects.",
+          "router_password": "The router's admin (web UI) password."
         }
       }
     },
     "error": {
       "invalid_ip_range": "Enter at least one IP range to scan.",
-      "password_without_host": "Enter the router address to use the router password.",
-      "invalid_auth": "The router rejected the admin password.",
-      "cannot_connect": "Could not reach the router at this address."
+      "invalid_host": "Enter the router address.",
+      "username_required": "This router brand needs a username.",
+      "password_required": "This router brand needs the admin password.",
+      "invalid_auth": "The router rejected the credentials.",
+      "cannot_connect": "Could not reach the router at this address.",
+      "unknown_brand": "This router brand is not available."
     }
   }
 }

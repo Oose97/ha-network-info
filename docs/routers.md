@@ -43,10 +43,30 @@ The shipped provider talks to the local Luci-style web API of Xiaomi/MiWiFi rout
 Only the router **admin password** is needed — the username is always `admin` on
 MiWiFi.
 
+## The brand catalog
+
+`router/routers.json` describes every brand the config flow offers. One entry per
+brand:
+
+| Key | Meaning |
+|---|---|
+| `id` | Internal brand id; maps to the provider class. |
+| `name` | Label shown in the config flow dropdown. |
+| `default_gateway` | Pre-fills the router address field. |
+| `requires_username` | Whether the flow shows a username field. |
+| `requires_password` | Whether the flow shows a password field. |
+| `default_https` | Start talking HTTPS (self-signed certs accepted). Providers fall back to HTTP when the router has no TLS listener, and upgrade to HTTPS when the router redirects — either way both firmware generations work. |
+| `api_endpoint` | The API base shape, for reference and for providers that build URLs from it. |
+
+The config flow reads the catalog for its dropdown (with **None (scanning only)** as
+the default choice) and pre-fills the router step from the selected entry; only the
+credential fields the brand requires are shown.
+
 ## Adding a brand
 
 1. Add a module in `router/` implementing `RouterProvider` for that brand's API.
-2. Construct it in the coordinator instead of (or alongside) the Xiaomi one.
+2. Add its entry to `router/routers.json`.
+3. Map the id to the class in `create_provider()` (`router/__init__.py`).
 
-A config-flow brand selector is planned so this becomes a dropdown rather than a code
-change; the interface is already shaped for it.
+The brand then appears in the config flow dropdown with its defaults — no flow or
+coordinator changes needed.

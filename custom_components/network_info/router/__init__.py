@@ -8,8 +8,17 @@ here that implements :class:`RouterProvider`; nothing else changes.
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import cache
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
+
+CATALOG_FILE = Path(__file__).parent / "routers.json"
 
 
 class RouterError(Exception):
@@ -56,3 +65,43 @@ def normalize_mac(mac: str | None) -> str | None:
         return None
     mac = mac.strip().lower().replace("-", ":")
     return mac or None
+
+
+@cache
+def load_catalog() -> dict[str, dict[str, Any]]:
+    """The router-brand catalog from routers.json, keyed by brand id.
+
+    Each entry describes a supported brand: display name, default gateway,
+    whether the config flow must ask for a username and/or password, whether
+    to talk HTTPS by default, and the API endpoint shape. Blocking file I/O —
+    call via an executor from async code (cached after the first call).
+    """
+    with CATALOG_FILE.open(encoding="utf-8") as fh:
+        data = json.load(fh)
+    return {item["id"]: item for item in data.get("routers", [])}
+
+
+def create_provider(
+    brand: str,
+    host: str,
+    username: str,
+    password: str,
+    session: ClientSession,
+    use_https: bool,
+) -> RouterProvider | None:
+    """Instantiate the provider for a catalog brand id; None when unknown."""
+    from .xiaomi_miwifi import XiaomiMiWiFiProvider  # avoids an import cycle
+
+    classes: dict[str, type] = {
+        "xiaomi_miwifi": XiaomiMiWiFiProvider,
+    }
+    cls = classes.get(brand)
+    if cls is None:
+        return None
+    return cls(
+        host=host,
+        password=password,
+        session=session,
+        username=username,
+        use_https=use_https,
+    )
