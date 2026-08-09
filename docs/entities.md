@@ -25,7 +25,7 @@ One entry per device — everything the integration knows, remembered or live:
 | `signal` | `58` | router, wireless clients only |
 | `online` | `true` | scan / router |
 | `router_name` | `MyPhone` | router |
-| `ha_device` | `Living Room TV` | HA device registry (matched by MAC) |
+| `ha_device` | `Living Room TV` | HA device registry — matched by MAC, falling back to IP (config-entry host / configuration URL) for devices whose integration never learns a MAC |
 | `ha_area` | `Living Room` | HA area registry |
 | `first_seen` | `2026-08-09T07:00:00+00:00` | integration memory |
 | `last_seen` | `2026-08-09T09:15:00+00:00` | integration memory — last time seen **online** |

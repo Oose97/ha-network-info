@@ -14,7 +14,10 @@ Every interval (and on every manual refresh) the coordinator runs the same seque
 4. **Memory fold** — the merged cycle updates the persistent memory, and remembered
    devices missing from the cycle are appended as offline rows.
 5. **Registry enrichment** — every MAC is looked up in Home Assistant's device
-   registry; matches get their HA name and area.
+   registry; matches get their HA name and area. Devices whose integration never
+   records a MAC (IPP printers and other UUID-identified gear) match by IP
+   instead, taken from config-entry host values and configuration URLs — MAC
+   always wins when both could apply.
 
 ## The scanner
 

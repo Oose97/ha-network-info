@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientTimeout
 
@@ -385,7 +386,12 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         return True
 
     def _enrich_from_registries(self, devices: list[dict[str, Any]]) -> None:
-        """Attach Home Assistant device names and areas by MAC."""
+        """Attach Home Assistant device names and areas.
+
+        MAC is the primary key. Devices whose integrations never learn a MAC
+        (IPP printers and other UUID-identified gear) fall back to an IP
+        match, built from config-entry host values and configuration URLs.
+        """
         dev_reg = dr.async_get(self.hass)
         area_reg = ar.async_get(self.hass)
 
@@ -395,9 +401,13 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 if conn_type == dr.CONNECTION_NETWORK_MAC:
                     ha_by_mac[dr.format_mac(conn_id)] = device
 
+        ha_by_ip = self._ha_devices_by_ip(dev_reg)
+
         for entry in devices:
             mac = entry.get("mac")
             ha_device = ha_by_mac.get(dr.format_mac(mac)) if mac else None
+            if ha_device is None and entry.get("ip"):
+                ha_device = ha_by_ip.get(entry["ip"])
             if ha_device is not None:
                 entry["ha_device"] = ha_device.name_by_user or ha_device.name
                 area = (
@@ -413,6 +423,45 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 or entry.get("vendor")
                 or "Unknown"
             )
+
+    def _ha_devices_by_ip(
+        self, dev_reg: dr.DeviceRegistry
+    ) -> dict[str, dr.DeviceEntry]:
+        """Map IPs to HA devices via config-entry hosts and config URLs."""
+        # Config entries first — the host an integration polls is the most
+        # deliberate statement of "this device lives at this IP".
+        entry_ip: dict[str, str] = {}
+        for config_entry in self.hass.config_entries.async_entries():
+            for key in ("host", "ip_address"):
+                ip = _as_ipv4(config_entry.data.get(key))
+                if ip:
+                    entry_ip[config_entry.entry_id] = ip
+                    break
+
+        by_entry: dict[str, list[dr.DeviceEntry]] = {}
+        for device in dev_reg.devices.values():
+            for entry_id in device.config_entries:
+                if entry_id in entry_ip:
+                    by_entry.setdefault(entry_id, []).append(device)
+
+        ha_by_ip: dict[str, dr.DeviceEntry] = {}
+        for entry_id, dev_list in by_entry.items():
+            # A hub-style entry lists the hub and its children; the entry's
+            # host belongs to the hub — the device without a via_device.
+            root = next((d for d in dev_list if d.via_device_id is None), dev_list[0])
+            ha_by_ip.setdefault(entry_ip[entry_id], root)
+
+        for device in dev_reg.devices.values():
+            if not device.configuration_url:
+                continue
+            try:
+                ip = _as_ipv4(urlsplit(device.configuration_url).hostname)
+            except ValueError:
+                continue
+            if ip:
+                ha_by_ip.setdefault(ip, device)
+
+        return ha_by_ip
 
 
 def _new_device(
@@ -438,6 +487,16 @@ def _new_device(
         "ha_area": None,
         "sources": sources,
     }
+
+
+def _as_ipv4(value: Any) -> str | None:
+    """The value as a dotted IPv4 string, or None (hostnames are skipped)."""
+    if not value:
+        return None
+    try:
+        return str(IPv4Address(str(value).strip()))
+    except ValueError:
+        return None
 
 
 def _read_ip_log_csv(path: str, config_dir: str) -> list[dict[str, str]]:
