@@ -16,7 +16,7 @@ from .cards import async_unregister as async_unregister_cards
 from .const import DOMAIN, SERVICE_FORGET_DEVICE, STORAGE_VERSION, storage_key
 from .coordinator import NetworkInfoCoordinator
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
 
 NetworkInfoConfigEntry = ConfigEntry[NetworkInfoCoordinator]
 

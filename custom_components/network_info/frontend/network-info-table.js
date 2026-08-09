@@ -180,8 +180,10 @@ class NetworkInfoTable extends HTMLElement {
           .nit-filter { min-width: 140px; flex: 0 1 220px; padding: 6px 10px;
             border: 1px solid var(--divider-color, #444); border-radius: 8px;
             background: var(--card-background-color); color: var(--primary-text-color); }
-          .nit-gear { cursor: pointer; border: none; background: none; font-size: 1.15em;
-            color: var(--secondary-text-color); padding: 4px; }
+          .nit-gear, .nit-refresh { cursor: pointer; border: none; background: none;
+            font-size: 1.15em; color: var(--secondary-text-color); padding: 4px; }
+          .nit-refresh.spin { animation: nit-rot 1s linear infinite; }
+          @keyframes nit-rot { to { transform: rotate(360deg); } }
           .nit-scroll { overflow: auto; max-height: ${esc(this._cfg.max_height)}; }
           table.nit { border-collapse: collapse; width: 100%; font-size: 0.92em; }
           .nit th { position: sticky; top: 0; z-index: 1; text-align: left; white-space: nowrap;
@@ -228,6 +230,7 @@ class NetworkInfoTable extends HTMLElement {
           <div class="nit-bar">
             <span class="nit-title">${esc(this._cfg.title)}</span>
             <input class="nit-filter" type="text" placeholder="Filter…">
+            <button class="nit-refresh" title="Scan now">↻</button>
             <button class="nit-gear" title="Table settings">⚙</button>
           </div>
           <div class="nit-scroll"><table class="nit"><thead></thead><tbody></tbody></table></div>
@@ -238,6 +241,7 @@ class NetworkInfoTable extends HTMLElement {
 
     this._els = {
       filter: this.querySelector(".nit-filter"),
+      refresh: this.querySelector(".nit-refresh"),
       gear: this.querySelector(".nit-gear"),
       thead: this.querySelector("thead"),
       tbody: this.querySelector("tbody"),
@@ -249,6 +253,15 @@ class NetworkInfoTable extends HTMLElement {
     this._els.filter.addEventListener("input", () => {
       this._filter = this._els.filter.value;
       this._paint();
+    });
+    this._els.refresh.addEventListener("click", () => {
+      if (!this._hass) return;
+      // update_entity on a coordinator entity triggers a full refresh cycle
+      // (scan + router poll). The spin clears when the new data paints.
+      this._els.refresh.classList.add("spin");
+      this._hass.callService("homeassistant", "update_entity", {
+        entity_id: [this._cfg.entity],
+      });
     });
     this._els.gear.addEventListener("click", () => this._openSettings());
     this._els.overlay.addEventListener("click", (ev) => {
@@ -271,6 +284,7 @@ class NetworkInfoTable extends HTMLElement {
   // ── table ────────────────────────────────────────────────
   _paint() {
     if (!this._built) return;
+    this._els.refresh.classList.remove("spin");
     const attrs = this._attrs();
     if (!attrs) {
       this._els.tbody.innerHTML = `<tr><td>Entity ${esc(this._cfg.entity)} not found</td></tr>`;

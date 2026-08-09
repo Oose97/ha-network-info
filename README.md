@@ -17,6 +17,7 @@ Inspired by [network_scanner](https://github.com/parvez/network_scanner), rebuil
 - Per-path counters (LAN / 2.4 GHz / 5 GHz / guest / unknown)
 - `sensor.network_info_devices` — online device count with the full device list as attributes (excluded from the recorder to keep the database small)
 - `sensor.network_info_home_assistant_ip` — HA's own local IP (diagnostic)
+- `button.network_info_scan_now` — trigger an immediate scan outside the regular interval (also usable from automations); the bundled card has a matching ↻ toolbar button
 - Optional router polling: add your router's address and admin password in the config flow; leave empty for scan-only mode
 - All settings changeable later via the integration's **Configure** dialog
 - Bundled **Network Info Table** Lovelace card — filterable, sortable, configurable columns, optional grouping into 2.4 GHz / 5 GHz / LAN sections (registered as a dashboard resource automatically)
@@ -107,6 +108,7 @@ Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `sig
 Card features:
 
 - **Filter box** — matches against every field (name, IP, MAC, vendor, area, …)
+- **↻ refresh** — triggers an immediate scan when the list feels stale (the regular interval keeps running)
 - **Click a header to sort**; IPs sort numerically
 - **⚙ settings sheet** — show/hide and reorder columns, per browser (localStorage)
 - **Group into 2.4 GHz / 5 GHz / LAN tables** — renders one section per connection path with device counts. This option only appears when the integration has router access; without the router admin password there is no path information, and the toggle is shown disabled with a hint.

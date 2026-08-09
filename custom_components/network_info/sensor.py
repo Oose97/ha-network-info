@@ -6,10 +6,8 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import NetworkInfoConfigEntry
 from .const import (
@@ -19,9 +17,9 @@ from .const import (
     ATTR_LAST_SCAN,
     ATTR_ROUTER_AVAILABLE,
     ATTR_ROUTER_MODEL,
-    DOMAIN,
 )
 from .coordinator import NetworkInfoCoordinator
+from .entity import NetworkInfoEntity
 
 
 async def async_setup_entry(
@@ -39,24 +37,7 @@ async def async_setup_entry(
     )
 
 
-class NetworkInfoBaseSensor(CoordinatorEntity[NetworkInfoCoordinator], SensorEntity):
-    """Common device grouping for all Network Info entities."""
-
-    _attr_has_entity_name = True
-
-    def __init__(
-        self, coordinator: NetworkInfoCoordinator, entry: NetworkInfoConfigEntry
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Network Info",
-            entry_type=DeviceEntryType.SERVICE,
-            manufacturer="Network Info",
-        )
-
-
-class NetworkDevicesSensor(NetworkInfoBaseSensor):
+class NetworkDevicesSensor(NetworkInfoEntity, SensorEntity):
     """Number of online devices, with the full device list as attributes."""
 
     _attr_name = "Devices"
@@ -93,7 +74,7 @@ class NetworkDevicesSensor(NetworkInfoBaseSensor):
         }
 
 
-class HomeAssistantIpSensor(NetworkInfoBaseSensor):
+class HomeAssistantIpSensor(NetworkInfoEntity, SensorEntity):
     """Home Assistant's own local IP address."""
 
     _attr_name = "Home Assistant IP"

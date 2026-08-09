@@ -71,6 +71,8 @@ jobs:
           import custom_components.network_info.coordinator
           import custom_components.network_info.scanner
           import custom_components.network_info.sensor
+          import custom_components.network_info.button
+          import custom_components.network_info.entity
           import custom_components.network_info.cards
           import custom_components.network_info.router.xiaomi_miwifi
           print('all modules import cleanly')
