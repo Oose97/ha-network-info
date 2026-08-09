@@ -23,6 +23,7 @@ from .const import (
     CONF_ROUTER_HOST,
     CONF_ROUTER_PASSWORD,
     CONF_SCAN_INTERVAL,
+    CONNECTION_ROUTER,
     CONNECTION_SLUGS,
     CONNECTION_UNKNOWN,
     DEFAULT_SCAN_INTERVAL_MINUTES,
@@ -66,6 +67,9 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         self._provider: RouterProvider | None = None
         router_host = (config.get(CONF_ROUTER_HOST) or "").strip()
         router_password = config.get(CONF_ROUTER_PASSWORD) or ""
+        # The device at this address IS the router — known from config even
+        # without a password, so it can be labeled regardless of API access.
+        self._router_ip = router_host.split("://")[-1].split("/")[0].split(":")[0]
         if router_host and router_password:
             self._provider = XiaomiMiWiFiProvider(
                 router_host, router_password, async_get_clientsession(hass)
@@ -115,6 +119,11 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                     )
 
         devices = self._merge(scanned, router_clients)
+        if self._router_ip:
+            for device in devices:
+                if device["ip"] == self._router_ip:
+                    device["connection"] = CONNECTION_ROUTER
+                    break
         self._apply_memory(devices)
         self._enrich_from_registries(devices)
         devices.sort(key=_ip_sort_key)

@@ -24,6 +24,7 @@ MIN_SCAN_INTERVAL_MINUTES = 1
 
 # Connection-path labels shown to the user. The router provider decides which
 # one applies to a client; the scanner alone can never know the path.
+CONNECTION_ROUTER = "Router"
 CONNECTION_LAN = "LAN"
 CONNECTION_WIFI_24 = "2.4 GHz"
 CONNECTION_WIFI_5 = "5 GHz"
@@ -33,6 +34,7 @@ CONNECTION_UNKNOWN = "Unknown"
 
 # Slugs used for the per-path counters in sensor attributes.
 CONNECTION_SLUGS = {
+    CONNECTION_ROUTER: "router",
     CONNECTION_LAN: "lan",
     CONNECTION_WIFI_24: "wifi_2_4_ghz",
     CONNECTION_WIFI_5: "wifi_5_ghz",

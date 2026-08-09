@@ -19,7 +19,7 @@ One entry per device — everything the integration knows, remembered or live:
 | `name` | `Living Room TV` | best of: HA name → router name → hostname → vendor |
 | `hostname` | `tv-livingroom.lan` | reverse DNS |
 | `vendor` | `TP-Link Systems Inc.` | MAC OUI |
-| `connection` | `2.4 GHz`, `5 GHz`, `LAN`, `Guest`, `Wi-Fi`, `Unknown` | router (last known value is kept in scan-only mode) |
+| `connection` | `Router`, `2.4 GHz`, `5 GHz`, `LAN`, `Guest`, `Wi-Fi`, `Unknown` | router API; `Router` marks the configured router address itself (works without a password); last known value is kept in scan-only mode |
 | `signal` | `58` | router, wireless clients only |
 | `online` | `true` | scan / router |
 | `router_name` | `MyPhone` | router |
