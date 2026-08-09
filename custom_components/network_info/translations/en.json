@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Network Info",
+        "description": "Scans your network for all devices and, when router access is configured, shows which path each device uses (LAN, 2.4 GHz or 5 GHz Wi-Fi). Leave the router fields empty to use scanning only.",
+        "data": {
+          "ip_range": "IP range(s) to scan",
+          "scan_interval": "Scan interval",
+          "router_host": "Router address (optional)",
+          "router_password": "Router admin password (optional)"
+        },
+        "data_description": {
+          "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces. Pre-filled from Home Assistant's own network.",
+          "scan_interval": "How often to scan, in minutes.",
+          "router_host": "IP address of your Xiaomi/MiWiFi router. Needed only for connection-path and signal information.",
+          "router_password": "The router's admin (web UI) password. Leave empty to skip router polling."
+        }
+      }
+    },
+    "error": {
+      "invalid_ip_range": "Enter at least one IP range to scan.",
+      "password_without_host": "Enter the router address to use the router password.",
+      "invalid_auth": "The router rejected the admin password.",
+      "cannot_connect": "Could not reach the router at this address."
+    },
+    "abort": {
+      "already_configured": "This IP range is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Network Info options",
+        "data": {
+          "ip_range": "IP range(s) to scan",
+          "scan_interval": "Scan interval",
+          "router_host": "Router address (optional)",
+          "router_password": "Router admin password (optional)"
+        },
+        "data_description": {
+          "ip_range": "CIDR (192.168.1.0/24), dash range (192.168.1.1-254) or several ranges separated by spaces.",
+          "scan_interval": "How often to scan, in minutes.",
+          "router_host": "IP address of your Xiaomi/MiWiFi router. Needed only for connection-path and signal information.",
+          "router_password": "The router's admin (web UI) password. Leave empty to disable router polling."
+        }
+      }
+    },
+    "error": {
+      "invalid_ip_range": "Enter at least one IP range to scan.",
+      "password_without_host": "Enter the router address to use the router password.",
+      "invalid_auth": "The router rejected the admin password.",
+      "cannot_connect": "Could not reach the router at this address."
+    }
+  }
+}
