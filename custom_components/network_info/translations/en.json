@@ -16,7 +16,7 @@
           "scan_interval": "How often to scan, in minutes.",
           "router_brand": "Selecting a brand opens a second step with that brand's connection details pre-filled. None = no router polling; connection paths stay unknown.",
           "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
-          "external_ip_log": "Keeps a persistent log of every external IP change (implies tracking). A log sensor holds the rows; its state is the row count."
+          "external_ip_log": "Keeps a persistent log of every external IP change. Requires “Track external IP” to be enabled. A log sensor holds the rows; its state is the row count."
         }
       },
       "router": {
@@ -41,7 +41,8 @@
       "password_required": "This router brand needs the admin password.",
       "invalid_auth": "The router rejected the credentials.",
       "cannot_connect": "Could not reach the router at this address.",
-      "unknown_brand": "This router brand is not available."
+      "unknown_brand": "This router brand is not available.",
+      "log_requires_tracking": "Enable “Track external IP” to log its changes."
     },
     "abort": {
       "already_configured": "This IP range is already configured."
@@ -63,7 +64,7 @@
           "scan_interval": "How often to scan, in minutes.",
           "router_brand": "Selecting a brand opens a second step with that brand's connection details. None = no router polling; connection paths stay unknown.",
           "external_ip": "Fetches the network's public IP from api.ipify.org each scan cycle — the integration's only internet call.",
-          "external_ip_log": "Keeps a persistent log of every external IP change (implies tracking). A log sensor holds the rows; its state is the row count."
+          "external_ip_log": "Keeps a persistent log of every external IP change. Requires “Track external IP” to be enabled. A log sensor holds the rows; its state is the row count."
         }
       },
       "router": {
@@ -88,7 +89,8 @@
       "password_required": "This router brand needs the admin password.",
       "invalid_auth": "The router rejected the credentials.",
       "cannot_connect": "Could not reach the router at this address.",
-      "unknown_brand": "This router brand is not available."
+      "unknown_brand": "This router brand is not available.",
+      "log_requires_tracking": "Enable “Track external IP” to log its changes."
     }
   }
 }

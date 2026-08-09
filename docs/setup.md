@@ -27,7 +27,7 @@ network connection:
 | Scan interval | Minutes between automatic scans. Default 15, allowed 1–1440. A `/24` ping sweep takes a few seconds, so short intervals are harmless. |
 | Router brand | **None (scanning only)** by default. Pick your router's brand to get per-device connection paths and signal — the supported brands come from the [router catalog](routers.md#the-brand-catalog). |
 | Track external IP | Fetches the network's public IP from `api.ipify.org` each scan cycle and publishes it as a sensor. This is the integration's **only** internet call, and only when enabled. |
-| Log external IP changes | Keeps a persistent log of every external IP change (implies tracking). The log survives restarts and is capped at the newest 500 entries. |
+| Log external IP changes | Keeps a persistent log of every external IP change. Requires **Track external IP** to be enabled. The log survives restarts and is capped at the newest 500 entries. |
 
 Choosing a brand opens the second step, pre-filled from the catalog. Only the fields
 that brand actually needs are shown:

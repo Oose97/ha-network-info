@@ -150,6 +150,8 @@ def _normalize_base(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[st
     }
     if not data[CONF_IP_RANGE]:
         errors[CONF_IP_RANGE] = "invalid_ip_range"
+    if data[CONF_EXTERNAL_IP_LOG] and not data[CONF_EXTERNAL_IP]:
+        errors[CONF_EXTERNAL_IP_LOG] = "log_requires_tracking"
     return data, errors
 
 
