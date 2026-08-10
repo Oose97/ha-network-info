@@ -137,6 +137,16 @@
             "router_username": "The username its web interface expects.",
             "router_password": "Its admin (web UI) password."
           }
+        },
+        "address": {
+          "title": "Access point address",
+          "description": "Optional, and only used to label the access point itself in the device table — it is not contacted.",
+          "data": {
+            "router_host": "Address"
+          },
+          "data_description": {
+            "router_host": "IP address of this access point, if you know it. Leave empty to skip."
+          }
         }
       },
       "error": {

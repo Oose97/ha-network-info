@@ -344,8 +344,9 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
                 self._data = {CONF_AP_NAME: name, CONF_ROUTER_BRAND: brand}
                 if brand == ROUTER_BRAND_NONE:
                     # Declared but not polled: enough to know the gateway's
-                    # view of what is wired cannot be complete.
-                    return self._finish(reconfigure)
+                    # view of what is wired cannot be complete. Its address is
+                    # still worth having, to label the access point itself.
+                    return await self._async_step_address(None, reconfigure)
                 return await self._async_step_credentials(None, reconfigure)
             defaults = user_input
         else:
@@ -355,6 +356,34 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
             step_id=step,
             data_schema=_ap_schema(defaults, catalog),
             errors=errors,
+        )
+
+    async def async_step_address(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.SubentryFlowResult:
+        return await self._async_step_address(user_input, False)
+
+    async def _async_step_address(
+        self, user_input: dict[str, Any] | None, reconfigure: bool
+    ) -> config_entries.SubentryFlowResult:
+        """Address only, for an access point that is declared but not polled."""
+        if user_input is not None:
+            self._data[CONF_ROUTER_HOST] = (
+                user_input.get(CONF_ROUTER_HOST) or ""
+            ).strip()
+            return self._finish(reconfigure)
+
+        current = self._entry_data() if reconfigure else {}
+        return self.async_show_form(
+            step_id="address",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_ROUTER_HOST,
+                        default=current.get(CONF_ROUTER_HOST, ""),
+                    ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+                }
+            ),
         )
 
     async def async_step_credentials(

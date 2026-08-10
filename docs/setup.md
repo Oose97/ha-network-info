@@ -63,10 +63,13 @@ without touching anything else.
 |---|---|
 | Name | How the access point appears in the device table, e.g. the room it covers. |
 | Brand | Pick a brand to poll it for connected devices. **None** declares that it exists without polling it. |
-| Address / username / password | Shown once a brand is picked, prefilled from the catalog, verified before the access point is saved. |
+| Address / username / password | Shown once a brand is picked, prefilled from the catalog, verified before the access point is saved. With brand **None** just an optional address is asked for — it is never contacted, only used to label the access point itself in the table. |
 
 Two things change once an access point is added:
 
+- The access point itself is labelled **Access point** in the table, the way the
+  main router is labelled **Router** — so the network's own infrastructure reads
+  as such rather than as whatever port it sits on.
 - Devices it reports as wireless get that band, its signal, and its name in the
   **Access point** column — the access point's word beats the gateway's, since
   it is the one actually holding the association.
