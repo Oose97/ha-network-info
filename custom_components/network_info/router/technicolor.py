@@ -233,6 +233,19 @@ class TechnicolorProvider(RouterProvider):
         # a wired port (from the gateway's point of view — a device behind a
         # downstream access point or switch is wired as far as it can tell).
         wireless = await self._async_wireless_stations()
+        # A radio-configuration page carries the access points' own BSSIDs, not
+        # the clients'. Those look exactly like a station list to a MAC scan,
+        # and trusting one would mark every real device wired. If nothing in it
+        # matches a known device, it is not a station list — drop it and leave
+        # the paths unknown rather than claim something false.
+        if wireless and not (wireless.keys() & clients.keys()):
+            _LOGGER.debug(
+                "Wireless page listed %d MACs, none of them known devices — "
+                "treating it as radio config, not a station list",
+                len(wireless),
+            )
+            wireless = {}
+
         for mac, client in clients.items():
             station = wireless.get(mac)
             if station is not None:

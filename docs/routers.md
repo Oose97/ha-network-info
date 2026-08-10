@@ -102,6 +102,12 @@ Two modals are read, mirroring the two-endpoint pattern:
   a lot between builds, so each station's band is taken from the nearest
   preceding radio heading rather than an assumed column.
 
+The wireless page is only trusted when at least one MAC on it belongs to a
+device the gateway listed. Some builds serve radio *configuration* there — the
+access points' own BSSIDs — which looks like a station list but would mark
+every real client wired; that case is detected and discarded, leaving paths
+unknown rather than wrong.
+
 An online device absent from the wireless list is reported as **LAN**, because
 that is how the gateway sees it. Note this covers devices behind a downstream
 access point or switch too: they reach the gateway over a wired port, so the
