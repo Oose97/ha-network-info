@@ -21,18 +21,28 @@
       },
       "router": {
         "title": "Router details",
-        "description": "Connection details for your {brand} router. The address is pre-filled with the brand's usual gateway — adjust it if yours differs.",
+        "description": "Connection details for your {brand} router. The address is pre-filled with the brand's usual gateway — adjust it if yours differs. The brand's usual username and HTTP(S) transport are applied automatically.",
         "data": {
           "router_host": "Router address",
-          "router_username": "Username",
           "router_password": "Admin password",
-          "router_https": "Connect over HTTPS"
+          "override_defaults": "Override the username / HTTPS defaults"
         },
         "data_description": {
           "router_host": "IP address of the router on your network.",
-          "router_username": "Usually left at the default; some firmware revisions expect a different one.",
           "router_password": "The router's admin (web UI) password.",
-          "router_https": "Pre-set to what this brand normally uses. Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP. Self-signed certificates are accepted."
+          "override_defaults": "The brand defaults suit almost every device. Turn this on to review and change them in one more step."
+        }
+      },
+      "overrides": {
+        "title": "Username and HTTPS",
+        "description": "The defaults for your {brand} router, editable. What you set here is kept — even a field you clear stays cleared.",
+        "data": {
+          "router_username": "Username",
+          "router_https": "Connect over HTTPS"
+        },
+        "data_description": {
+          "router_username": "The brand default suits most firmware revisions; change it if yours expects a different one.",
+          "router_https": "Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP. Self-signed certificates are accepted."
         }
       }
     },
@@ -71,18 +81,28 @@
       },
       "router": {
         "title": "Router details",
-        "description": "Connection details for your {brand} router.",
+        "description": "Connection details for your {brand} router. The brand's usual username and HTTP(S) transport are applied automatically.",
         "data": {
           "router_host": "Router address",
-          "router_username": "Username",
           "router_password": "Admin password",
-          "router_https": "Connect over HTTPS"
+          "override_defaults": "Override the username / HTTPS defaults"
         },
         "data_description": {
           "router_host": "IP address of the router on your network.",
-          "router_username": "Usually left at the default; some firmware revisions expect a different one.",
           "router_password": "The router's admin (web UI) password.",
-          "router_https": "Pre-set to what this brand normally uses. Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP. Self-signed certificates are accepted."
+          "override_defaults": "The brand defaults suit almost every device. Turn this on to review and change them in one more step."
+        }
+      },
+      "overrides": {
+        "title": "Username and HTTPS",
+        "description": "The defaults for your {brand} router, editable. What you set here is kept — even a field you clear stays cleared.",
+        "data": {
+          "router_username": "Username",
+          "router_https": "Connect over HTTPS"
+        },
+        "data_description": {
+          "router_username": "The brand default suits most firmware revisions; change it if yours expects a different one.",
+          "router_https": "Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP. Self-signed certificates are accepted."
         }
       }
     },
@@ -130,18 +150,28 @@
         },
         "credentials": {
           "title": "Access point details",
-          "description": "Connection details for this {brand} access point.",
+          "description": "Connection details for this {brand} access point. The brand's usual username and HTTP(S) transport are applied automatically.",
           "data": {
             "router_host": "Access point address",
-            "router_username": "Username",
             "router_password": "Admin password",
-            "router_https": "Connect over HTTPS"
+            "override_defaults": "Override the username / HTTPS defaults"
           },
           "data_description": {
             "router_host": "IP address of the access point on your network.",
-            "router_username": "Usually left at the default; some firmware revisions expect a different one.",
             "router_password": "Its admin (web UI) password.",
-            "router_https": "Pre-set to what this brand normally uses. Turn it on if the access point's local management is HTTPS-only."
+            "override_defaults": "The brand defaults suit almost every device. Turn this on to review and change them in one more step."
+          }
+        },
+        "overrides": {
+          "title": "Username and HTTPS",
+          "description": "The defaults for this {brand} access point, editable. What you set here is kept — even a field you clear stays cleared.",
+          "data": {
+            "router_username": "Username",
+            "router_https": "Connect over HTTPS"
+          },
+          "data_description": {
+            "router_username": "The brand default suits most firmware revisions; change it if yours expects a different one.",
+            "router_https": "Turn it on if the access point's local management is HTTPS-only, off if it is plain HTTP. Self-signed certificates are accepted."
           }
         },
         "address": {

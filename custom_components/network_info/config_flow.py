@@ -2,9 +2,11 @@
 
 Two steps: the basics (scan range, interval, router brand, external IP
 toggles), then — only when a router brand is selected — the router details,
-prefilled from the brand catalog (router/routers.json) and showing only the
-credential fields that brand requires. Brand "None" skips router polling
-entirely.
+prefilled from the brand catalog (router/routers.json). The router step asks
+only for what varies per household: address and password. The brand's usual
+username and HTTP(S) transport apply silently, unless the "change defaults"
+toggle opens one more step that shows them for overriding. Brand "None" skips
+router polling entirely.
 """
 
 from __future__ import annotations
@@ -56,6 +58,9 @@ from .router import RouterAuthError, RouterError, create_provider, load_catalog
 _LOGGER = logging.getLogger(__name__)
 
 FALLBACK_IP_RANGE = "192.168.1.0/24"
+
+# Form-only field: whether to open the overrides step. Never stored.
+CONF_ROUTER_OVERRIDE = "override_defaults"
 
 
 async def _async_default_ip_range(hass: HomeAssistant) -> str:
@@ -114,28 +119,41 @@ def _base_schema(
     )
 
 
-def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema:
-    """The connection form for one router.
+def _catalog_router_defaults(spec: dict[str, Any]) -> dict[str, Any]:
+    """What applies when the user does not override: the brand's catalog says."""
+    return {
+        CONF_ROUTER_USERNAME: spec.get("default_username", ""),
+        CONF_ROUTER_USE_HTTPS: bool(spec.get("default_https")),
+    }
 
-    The catalog seeds the defaults; every field stays editable. A brand that
-    normally needs no username still offers one, because firmware revisions
-    differ on that, and the transport is a plain toggle for the same reason.
+
+def _has_override(current: dict[str, Any], spec: dict[str, Any]) -> bool:
+    """Whether stored values differ from the brand's catalog defaults.
+
+    Pre-checks the overrides toggle on a revisit, so an override made earlier
+    is shown rather than silently reverted.
     """
-    # A field the user has already touched keeps what they put there, even
-    # when that is deliberately empty — the catalog default only fills a field
-    # that has never been submitted, or a re-shown form would keep reinstating
-    # a value the user just cleared.
-    username_default = defaults.get(CONF_ROUTER_USERNAME)
-    if username_default is None:
-        username_default = spec.get("default_username", "")
+    if CONF_ROUTER_USERNAME not in current and CONF_ROUTER_USE_HTTPS not in current:
+        return False
+    catalog = _catalog_router_defaults(spec)
+    return (
+        current.get(CONF_ROUTER_USERNAME, catalog[CONF_ROUTER_USERNAME])
+        != catalog[CONF_ROUTER_USERNAME]
+        or bool(current.get(CONF_ROUTER_USE_HTTPS, catalog[CONF_ROUTER_USE_HTTPS]))
+        != catalog[CONF_ROUTER_USE_HTTPS]
+    )
+
+
+def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema:
+    """The connection form for one router: what varies per household.
+
+    Username and transport live behind the overrides toggle — the catalog
+    default covers nearly everyone, and a field shown is a field the form
+    keeps trying to refill.
+    """
     host_default = defaults.get(CONF_ROUTER_HOST)
     if host_default is None:
         host_default = spec.get("default_gateway", "")
-    username_key = (
-        vol.Required(CONF_ROUTER_USERNAME, default=username_default)
-        if spec.get("requires_username")
-        else vol.Optional(CONF_ROUTER_USERNAME, default=username_default)
-    )
     password_key = (
         vol.Required(CONF_ROUTER_PASSWORD, default=defaults.get(CONF_ROUTER_PASSWORD, ""))
         if spec.get("requires_password")
@@ -143,19 +161,46 @@ def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema
             CONF_ROUTER_PASSWORD, default=defaults.get(CONF_ROUTER_PASSWORD, "")
         )
     )
-    https_default = defaults.get(CONF_ROUTER_USE_HTTPS)
-    if https_default is None:
-        https_default = bool(spec.get("default_https"))
     return vol.Schema(
         {
             vol.Required(CONF_ROUTER_HOST, default=host_default): TextSelector(
                 TextSelectorConfig(type=TextSelectorType.TEXT)
             ),
-            username_key: TextSelector(
-                TextSelectorConfig(type=TextSelectorType.TEXT)
-            ),
             password_key: TextSelector(
                 TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
+            vol.Required(
+                CONF_ROUTER_OVERRIDE,
+                default=bool(defaults.get(CONF_ROUTER_OVERRIDE, False)),
+            ): BooleanSelector(),
+        }
+    )
+
+
+def _overrides_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema:
+    """The overrides form: username and transport, seeded from the catalog.
+
+    A field the user has already touched keeps what they put there, even when
+    that is deliberately empty — the catalog default only fills a field that
+    has never been submitted, or a re-shown form would keep reinstating a
+    value the user just cleared.
+    """
+    catalog = _catalog_router_defaults(spec)
+    username_default = defaults.get(CONF_ROUTER_USERNAME)
+    if username_default is None:
+        username_default = catalog[CONF_ROUTER_USERNAME]
+    https_default = defaults.get(CONF_ROUTER_USE_HTTPS)
+    if https_default is None:
+        https_default = catalog[CONF_ROUTER_USE_HTTPS]
+    username_key = (
+        vol.Required(CONF_ROUTER_USERNAME, default=username_default)
+        if spec.get("requires_username")
+        else vol.Optional(CONF_ROUTER_USERNAME, default=username_default)
+    )
+    return vol.Schema(
+        {
+            username_key: TextSelector(
+                TextSelectorConfig(type=TextSelectorType.TEXT)
             ),
             vol.Required(
                 CONF_ROUTER_USE_HTTPS, default=bool(https_default)
@@ -193,7 +238,7 @@ def _ap_schema(
 
 
 def _submitted_router(user_input: dict[str, Any]) -> dict[str, Any]:
-    """What the user actually submitted, with every field spelled out.
+    """What the router step actually submitted, every field spelled out.
 
     An optional field left empty is dropped from the submission entirely, so a
     redisplayed form cannot tell "cleared" from "never filled in" — and would
@@ -202,9 +247,29 @@ def _submitted_router(user_input: dict[str, Any]) -> dict[str, Any]:
     """
     return {
         CONF_ROUTER_HOST: user_input.get(CONF_ROUTER_HOST, ""),
-        CONF_ROUTER_USERNAME: user_input.get(CONF_ROUTER_USERNAME, ""),
         CONF_ROUTER_PASSWORD: user_input.get(CONF_ROUTER_PASSWORD, ""),
+        CONF_ROUTER_OVERRIDE: bool(user_input.get(CONF_ROUTER_OVERRIDE, False)),
+    }
+
+
+def _submitted_overrides(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Same treatment for the overrides step: cleared stays cleared."""
+    return {
+        CONF_ROUTER_USERNAME: user_input.get(CONF_ROUTER_USERNAME, ""),
         CONF_ROUTER_USE_HTTPS: bool(user_input.get(CONF_ROUTER_USE_HTTPS, False)),
+    }
+
+
+def _errors_on(errors: dict[str, str], *fields: str) -> dict[str, str]:
+    """Anchor each error to a field this step actually shows.
+
+    Validation covers the whole router config while the fields are spread
+    over two steps; an error keyed to a field the current form lacks would
+    not render at all.
+    """
+    return {
+        (key if key in fields or key == "base" else "base"): message
+        for key, message in errors.items()
     }
 
 
@@ -235,12 +300,11 @@ async def _check_router(
     spec: dict[str, Any],
     user_input: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Validate the router step and merge its fields into the entry data."""
+    """Validate the full router config and merge it into the entry data."""
     errors: dict[str, str] = {}
     host = (user_input.get(CONF_ROUTER_HOST) or "").strip()
     username = (user_input.get(CONF_ROUTER_USERNAME) or "").strip()
     password = user_input.get(CONF_ROUTER_PASSWORD) or ""
-    # The catalog only supplies the default; what the form says wins.
     use_https = bool(
         user_input.get(CONF_ROUTER_USE_HTTPS, spec.get("default_https"))
     )
@@ -293,6 +357,7 @@ class NetworkInfoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._base: dict[str, Any] | None = None
+        self._router_input: dict[str, Any] | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -323,16 +388,51 @@ class NetworkInfoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         spec = catalog[self._base[CONF_ROUTER_BRAND]]
         errors: dict[str, str] = {}
         if user_input is not None:
-            data, errors = await _check_router(self.hass, self._base, spec, user_input)
+            self._router_input = _submitted_router(user_input)
+            if self._router_input[CONF_ROUTER_OVERRIDE]:
+                return await self.async_step_overrides()
+            data, errors = await _check_router(
+                self.hass,
+                self._base,
+                spec,
+                {**self._router_input, **_catalog_router_defaults(spec)},
+            )
             if not errors:
                 return self._create(data)
-            defaults = _submitted_router(user_input)
+            errors = _errors_on(errors, CONF_ROUTER_HOST, CONF_ROUTER_PASSWORD)
+            defaults = self._router_input
         else:
             defaults = {}
 
         return self.async_show_form(
             step_id="router",
             data_schema=_router_schema(defaults, spec),
+            errors=errors,
+            description_placeholders={"brand": spec["name"]},
+        )
+
+    async def async_step_overrides(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        assert self._base is not None and self._router_input is not None
+        catalog = await _load_catalog(self.hass)
+        spec = catalog[self._base[CONF_ROUTER_BRAND]]
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            overrides = _submitted_overrides(user_input)
+            data, errors = await _check_router(
+                self.hass, self._base, spec, {**self._router_input, **overrides}
+            )
+            if not errors:
+                return self._create(data)
+            errors = _errors_on(errors, CONF_ROUTER_USERNAME, CONF_ROUTER_USE_HTTPS)
+            defaults = overrides
+        else:
+            defaults = {}
+
+        return self.async_show_form(
+            step_id="overrides",
+            data_schema=_overrides_schema(defaults, spec),
             errors=errors,
             description_placeholders={"brand": spec["name"]},
         )
@@ -363,6 +463,8 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._router_input: dict[str, Any] | None = None
+        self._reconfigure = False
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -380,6 +482,9 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
         catalog = await _load_catalog(self.hass)
         errors: dict[str, str] = {}
         step = "reconfigure" if reconfigure else "user"
+        # Later steps re-enter through their own handlers, which cannot carry
+        # the flag; the flow instance can.
+        self._reconfigure = reconfigure
         if user_input is not None:
             name = (user_input.get(CONF_AP_NAME) or "").strip()
             brand = user_input.get(CONF_ROUTER_BRAND, ROUTER_BRAND_NONE)
@@ -391,8 +496,8 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
                     # Declared but not polled: enough to know the gateway's
                     # view of what is wired cannot be complete. Its address is
                     # still worth having, to label the access point itself.
-                    return await self._async_step_address(None, reconfigure)
-                return await self._async_step_credentials(None, reconfigure)
+                    return await self.async_step_address()
+                return await self.async_step_credentials()
             defaults = user_input
         else:
             defaults = dict(self._entry_data()) if reconfigure else {}
@@ -406,19 +511,14 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
     async def async_step_address(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.SubentryFlowResult:
-        return await self._async_step_address(user_input, False)
-
-    async def _async_step_address(
-        self, user_input: dict[str, Any] | None, reconfigure: bool
-    ) -> config_entries.SubentryFlowResult:
         """Address only, for an access point that is declared but not polled."""
         if user_input is not None:
             self._data[CONF_ROUTER_HOST] = (
                 user_input.get(CONF_ROUTER_HOST) or ""
             ).strip()
-            return self._finish(reconfigure)
+            return self._finish()
 
-        current = self._entry_data() if reconfigure else {}
+        current = self._entry_data() if self._reconfigure else {}
         return self.async_show_form(
             step_id="address",
             data_schema=vol.Schema(
@@ -431,30 +531,44 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
             ),
         )
 
+    def _stored_for_brand(self) -> dict[str, Any]:
+        """Stored details, only while the brand stays the same.
+
+        A brand switch starts from that brand's catalog defaults instead.
+        """
+        if not self._reconfigure:
+            return {}
+        current = self._entry_data()
+        if current.get(CONF_ROUTER_BRAND) != self._data.get(CONF_ROUTER_BRAND):
+            return {}
+        return current
+
     async def async_step_credentials(
         self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.SubentryFlowResult:
-        return await self._async_step_credentials(user_input, False)
-
-    async def _async_step_credentials(
-        self, user_input: dict[str, Any] | None, reconfigure: bool
     ) -> config_entries.SubentryFlowResult:
         catalog = await _load_catalog(self.hass)
         spec = catalog[self._data[CONF_ROUTER_BRAND]]
         errors: dict[str, str] = {}
         if user_input is not None:
+            self._router_input = _submitted_router(user_input)
+            if self._router_input[CONF_ROUTER_OVERRIDE]:
+                return await self.async_step_overrides()
             data, errors = await _check_router(
-                self.hass, self._data, spec, user_input
+                self.hass,
+                self._data,
+                spec,
+                {**self._router_input, **_catalog_router_defaults(spec)},
             )
             if not errors:
                 self._data = data
-                return self._finish(reconfigure)
-            defaults = _submitted_router(user_input)
+                return self._finish()
+            errors = _errors_on(errors, CONF_ROUTER_HOST, CONF_ROUTER_PASSWORD)
+            defaults = self._router_input
         else:
-            current = self._entry_data() if reconfigure else {}
+            stored = self._stored_for_brand()
             defaults = (
-                current
-                if current.get(CONF_ROUTER_BRAND) == self._data[CONF_ROUTER_BRAND]
+                {**stored, CONF_ROUTER_OVERRIDE: _has_override(stored, spec)}
+                if stored
                 else {}
             )
 
@@ -465,13 +579,40 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
             description_placeholders={"brand": spec["name"]},
         )
 
+    async def async_step_overrides(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.SubentryFlowResult:
+        assert self._router_input is not None
+        catalog = await _load_catalog(self.hass)
+        spec = catalog[self._data[CONF_ROUTER_BRAND]]
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            overrides = _submitted_overrides(user_input)
+            data, errors = await _check_router(
+                self.hass, self._data, spec, {**self._router_input, **overrides}
+            )
+            if not errors:
+                self._data = data
+                return self._finish()
+            errors = _errors_on(errors, CONF_ROUTER_USERNAME, CONF_ROUTER_USE_HTTPS)
+            defaults = overrides
+        else:
+            defaults = self._stored_for_brand()
+
+        return self.async_show_form(
+            step_id="overrides",
+            data_schema=_overrides_schema(defaults, spec),
+            errors=errors,
+            description_placeholders={"brand": spec["name"]},
+        )
+
     def _entry_data(self) -> dict[str, Any]:
         subentry = self._get_reconfigure_subentry()
         return dict(subentry.data) if subentry else {}
 
-    def _finish(self, reconfigure: bool) -> config_entries.SubentryFlowResult:
+    def _finish(self) -> config_entries.SubentryFlowResult:
         title = self._data[CONF_AP_NAME]
-        if reconfigure:
+        if self._reconfigure:
             return self.async_update_and_abort(
                 self._get_entry(),
                 self._get_reconfigure_subentry(),
@@ -482,13 +623,30 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
 
 
 class NetworkInfoOptionsFlow(config_entries.OptionsFlow):
-    """Allow changing everything after setup, same two steps."""
+    """Allow changing everything after setup, same steps as setup."""
 
     def __init__(self) -> None:
         self._base: dict[str, Any] | None = None
+        self._router_input: dict[str, Any] | None = None
 
     def _current(self) -> dict[str, Any]:
         return {**self.config_entry.data, **self.config_entry.options}
+
+    def _stored_for_brand(self) -> dict[str, Any]:
+        """Stored details, only while the brand stays the same.
+
+        A brand switch starts from that brand's catalog defaults. Entries
+        from before the brand field existed are Xiaomi ones.
+        """
+        assert self._base is not None
+        current = self._current()
+        same_brand = current.get(CONF_ROUTER_BRAND) == self._base[
+            CONF_ROUTER_BRAND
+        ] or (
+            current.get(CONF_ROUTER_BRAND) is None
+            and self._base[CONF_ROUTER_BRAND] == "xiaomi_miwifi"
+        )
+        return current if same_brand else {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -518,26 +676,56 @@ class NetworkInfoOptionsFlow(config_entries.OptionsFlow):
         spec = catalog[self._base[CONF_ROUTER_BRAND]]
         errors: dict[str, str] = {}
         if user_input is not None:
-            data, errors = await _check_router(self.hass, self._base, spec, user_input)
+            self._router_input = _submitted_router(user_input)
+            if self._router_input[CONF_ROUTER_OVERRIDE]:
+                return await self.async_step_overrides()
+            data, errors = await _check_router(
+                self.hass,
+                self._base,
+                spec,
+                {**self._router_input, **_catalog_router_defaults(spec)},
+            )
             if not errors:
                 return self.async_create_entry(data=data)
-            defaults = _submitted_router(user_input)
+            errors = _errors_on(errors, CONF_ROUTER_HOST, CONF_ROUTER_PASSWORD)
+            defaults = self._router_input
         else:
-            current = self._current()
-            # Keep the stored details only while the brand stays the same;
-            # a brand switch starts from that brand's catalog defaults.
-            same_brand = (
-                current.get(CONF_ROUTER_BRAND) == self._base[CONF_ROUTER_BRAND]
-                or (
-                    current.get(CONF_ROUTER_BRAND) is None
-                    and self._base[CONF_ROUTER_BRAND] == "xiaomi_miwifi"
-                )
+            stored = self._stored_for_brand()
+            defaults = (
+                {**stored, CONF_ROUTER_OVERRIDE: _has_override(stored, spec)}
+                if stored
+                else {}
             )
-            defaults = current if same_brand else {}
 
         return self.async_show_form(
             step_id="router",
             data_schema=_router_schema(defaults, spec),
+            errors=errors,
+            description_placeholders={"brand": spec["name"]},
+        )
+
+    async def async_step_overrides(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        assert self._base is not None and self._router_input is not None
+        catalog = await _load_catalog(self.hass)
+        spec = catalog[self._base[CONF_ROUTER_BRAND]]
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            overrides = _submitted_overrides(user_input)
+            data, errors = await _check_router(
+                self.hass, self._base, spec, {**self._router_input, **overrides}
+            )
+            if not errors:
+                return self.async_create_entry(data=data)
+            errors = _errors_on(errors, CONF_ROUTER_USERNAME, CONF_ROUTER_USE_HTTPS)
+            defaults = overrides
+        else:
+            defaults = self._stored_for_brand()
+
+        return self.async_show_form(
+            step_id="overrides",
+            data_schema=_overrides_schema(defaults, spec),
             errors=errors,
             description_placeholders={"brand": spec["name"]},
         )
