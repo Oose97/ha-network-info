@@ -194,7 +194,10 @@ class NetworkInfoTable extends HTMLElement {
             font-weight: 500; padding: 6px 10px 6px 0; cursor: pointer; user-select: none;
             border-bottom: 1px solid var(--divider-color, #444); }
           .nit td { padding: 5px 10px 5px 0; white-space: nowrap;
-            border-bottom: 1px solid color-mix(in srgb, var(--divider-color, #444) 40%, transparent); }
+            border-bottom: 1px solid color-mix(in srgb, var(--divider-color, #444) 40%, transparent);
+            /* The Home Assistant shell disables selection app-wide; cell text
+               has to ask for it back, or MAC and IP cannot be copied. */
+            -webkit-user-select: text; user-select: text; cursor: text; }
           .nit tr.off td { opacity: 0.45; }
           .nit tr.grp td { padding: 8px 0 4px; font-weight: 600; border-bottom: none;
             color: var(--primary-text-color); }

@@ -147,7 +147,10 @@ class NetworkInfoIpLog extends HTMLElement {
             border-bottom: 1px solid var(--divider-color, #444); }
           .nil td { padding: 5px 10px 5px 0; white-space: nowrap;
             font-family: ui-monospace, monospace; font-size: 0.95em;
-            border-bottom: 1px solid color-mix(in srgb, var(--divider-color, #444) 40%, transparent); }
+            border-bottom: 1px solid color-mix(in srgb, var(--divider-color, #444) 40%, transparent);
+            /* The Home Assistant shell disables selection app-wide; cell text
+               has to ask for it back, or an address cannot be copied. */
+            -webkit-user-select: text; user-select: text; cursor: text; }
           .nil tr.current td { font-weight: 600;
             background: rgba(76, 175, 80, 0.10); }
           .nil .cur-pill { display: inline-block; margin-left: 8px; padding: 0 8px;
