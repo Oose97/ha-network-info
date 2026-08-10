@@ -35,6 +35,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_AP_NAME,
     CONF_EXTERNAL_IP,
     CONF_EXTERNAL_IP_LOG,
     CONF_IP_RANGE,
@@ -48,6 +49,7 @@ from .const import (
     DOMAIN,
     MIN_SCAN_INTERVAL_MINUTES,
     ROUTER_BRAND_NONE,
+    SUBENTRY_TYPE_ACCESS_POINT,
 )
 from .router import RouterAuthError, RouterError, create_provider, load_catalog
 
@@ -122,7 +124,9 @@ def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema
     if spec.get("requires_username"):
         fields[
             vol.Required(
-                CONF_ROUTER_USERNAME, default=defaults.get(CONF_ROUTER_USERNAME, "")
+                CONF_ROUTER_USERNAME,
+                default=defaults.get(CONF_ROUTER_USERNAME)
+                or spec.get("default_username", ""),
             )
         ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
     if spec.get("requires_password"):
@@ -132,6 +136,34 @@ def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema
             )
         ] = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
     return vol.Schema(fields)
+
+
+def _ap_schema(
+    defaults: dict[str, Any], catalog: dict[str, dict[str, Any]]
+) -> vol.Schema:
+    brand_options = [
+        SelectOptionDict(
+            value=ROUTER_BRAND_NONE, label="None (declare only, no polling)"
+        )
+    ] + [
+        SelectOptionDict(value=brand_id, label=spec["name"])
+        for brand_id, spec in catalog.items()
+    ]
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_AP_NAME, default=defaults.get(CONF_AP_NAME, "")
+            ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
+            vol.Required(
+                CONF_ROUTER_BRAND,
+                default=defaults.get(CONF_ROUTER_BRAND, ROUTER_BRAND_NONE),
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=brand_options, mode=SelectSelectorMode.DROPDOWN
+                )
+            ),
+        }
+    )
 
 
 def _normalize_base(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
@@ -271,6 +303,108 @@ class NetworkInfoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> NetworkInfoOptionsFlow:
         return NetworkInfoOptionsFlow()
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: config_entries.ConfigEntry
+    ) -> dict[str, type[config_entries.ConfigSubentryFlow]]:
+        """Access points are children of the entry, added one at a time."""
+        return {SUBENTRY_TYPE_ACCESS_POINT: AccessPointSubentryFlow}
+
+
+class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
+    """Add or reconfigure one downstream access point."""
+
+    def __init__(self) -> None:
+        self._data: dict[str, Any] = {}
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.SubentryFlowResult:
+        return await self._async_step_name(user_input)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.SubentryFlowResult:
+        return await self._async_step_name(user_input, reconfigure=True)
+
+    async def _async_step_name(
+        self, user_input: dict[str, Any] | None, reconfigure: bool = False
+    ) -> config_entries.SubentryFlowResult:
+        catalog = await _load_catalog(self.hass)
+        errors: dict[str, str] = {}
+        step = "reconfigure" if reconfigure else "user"
+        if user_input is not None:
+            name = (user_input.get(CONF_AP_NAME) or "").strip()
+            brand = user_input.get(CONF_ROUTER_BRAND, ROUTER_BRAND_NONE)
+            if not name:
+                errors[CONF_AP_NAME] = "name_required"
+            if not errors:
+                self._data = {CONF_AP_NAME: name, CONF_ROUTER_BRAND: brand}
+                if brand == ROUTER_BRAND_NONE:
+                    # Declared but not polled: enough to know the gateway's
+                    # view of what is wired cannot be complete.
+                    return self._finish(reconfigure)
+                return await self._async_step_credentials(None, reconfigure)
+            defaults = user_input
+        else:
+            defaults = dict(self._entry_data()) if reconfigure else {}
+
+        return self.async_show_form(
+            step_id=step,
+            data_schema=_ap_schema(defaults, catalog),
+            errors=errors,
+        )
+
+    async def async_step_credentials(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.SubentryFlowResult:
+        return await self._async_step_credentials(user_input, False)
+
+    async def _async_step_credentials(
+        self, user_input: dict[str, Any] | None, reconfigure: bool
+    ) -> config_entries.SubentryFlowResult:
+        catalog = await _load_catalog(self.hass)
+        spec = catalog[self._data[CONF_ROUTER_BRAND]]
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data, errors = await _check_router(
+                self.hass, self._data, spec, user_input
+            )
+            if not errors:
+                self._data = data
+                return self._finish(reconfigure)
+            defaults = user_input
+        else:
+            current = self._entry_data() if reconfigure else {}
+            defaults = (
+                current
+                if current.get(CONF_ROUTER_BRAND) == self._data[CONF_ROUTER_BRAND]
+                else {}
+            )
+
+        return self.async_show_form(
+            step_id="credentials",
+            data_schema=_router_schema(defaults, spec),
+            errors=errors,
+            description_placeholders={"brand": spec["name"]},
+        )
+
+    def _entry_data(self) -> dict[str, Any]:
+        subentry = self._get_reconfigure_subentry()
+        return dict(subentry.data) if subentry else {}
+
+    def _finish(self, reconfigure: bool) -> config_entries.SubentryFlowResult:
+        title = self._data[CONF_AP_NAME]
+        if reconfigure:
+            return self.async_update_and_abort(
+                self._get_entry(),
+                self._get_reconfigure_subentry(),
+                data=self._data,
+                title=title,
+            )
+        return self.async_create_entry(title=title, data=self._data)
 
 
 class NetworkInfoOptionsFlow(config_entries.OptionsFlow):

@@ -25,11 +25,12 @@ One entry per device — everything the integration knows, remembered or live:
 | `signal` | `58` | router, wireless clients only |
 | `online` | `true` | scan / router |
 | `router_name` | `MyPhone` | router |
+| `access_point` | `Garage AP` | the access point holding the association, or `Main router` |
 | `ha_device` | `Living Room TV` | HA device registry — matched by MAC, falling back to IP (config-entry host / configuration URL) for devices whose integration never learns a MAC |
 | `ha_area` | `Living Room` | HA area registry |
 | `first_seen` | `2026-08-09T07:00:00+00:00` | integration memory |
 | `last_seen` | `2026-08-09T09:15:00+00:00` | integration memory — last time seen **online** |
-| `sources` | `["scan", "router"]` | who saw the device this cycle; `["memory"]` = remembered, currently absent |
+| `sources` | `["scan", "router"]` | who saw the device this cycle; also `access point`, and `["memory"]` = remembered, currently absent |
 
 ## Other attributes on the devices sensor
 
@@ -38,6 +39,7 @@ One entry per device — everything the integration knows, remembered or live:
 | `counts` | `total`, `online`, `offline`, and online devices per path: `lan`, `wifi_2_4_ghz`, `wifi_5_ghz`, `guest`, `wifi_other`, `unknown`. |
 | `router_available` | `true`/`false` while a router is configured; `null` when running scan-only. The card uses this to gate path grouping. |
 | `router_model` | Hardware id reported by the router, when available. |
+| `access_points` | One entry per configured access point: `name`, `brand`, `managed` (false when declared without credentials) and `available`. |
 | `ha_ip` | Same value as the diagnostic sensor. |
 | `last_scan` | UTC timestamp of the last completed cycle. |
 

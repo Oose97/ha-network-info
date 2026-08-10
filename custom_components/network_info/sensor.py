@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import NetworkInfoConfigEntry
 from .const import (
+    ATTR_ACCESS_POINTS,
     ATTR_COUNTS,
     ATTR_DEVICES,
     ATTR_HA_IP,
@@ -76,6 +77,7 @@ class NetworkDevicesSensor(NetworkInfoEntity, SensorEntity):
             ATTR_COUNTS: data.counts,
             ATTR_ROUTER_AVAILABLE: data.router_available,
             ATTR_ROUTER_MODEL: data.router_model,
+            ATTR_ACCESS_POINTS: data.access_points,
             ATTR_HA_IP: data.ha_ip,
             ATTR_LAST_SCAN: data.last_scan.isoformat() if data.last_scan else None,
         }

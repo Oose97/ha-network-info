@@ -92,5 +92,65 @@
       "unknown_brand": "This router brand is not available.",
       "log_requires_tracking": "Enable “Track external IP” to log its changes."
     }
+  },
+  "config_subentries": {
+    "access_point": {
+      "title": "Access point",
+      "entry_type": "Access point",
+      "initiate_flow": {
+        "user": "Add access point",
+        "reconfigure": "Reconfigure access point"
+      },
+      "step": {
+        "user": {
+          "title": "Add access point",
+          "data": {
+            "name": "Name",
+            "router_brand": "Brand"
+          },
+          "data_description": {
+            "name": "How this access point appears in the device table, e.g. the room it covers.",
+            "router_brand": "Pick the brand to poll it for connected devices. None declares that the access point exists without polling it — enough for the integration to stop reporting its wireless clients as wired."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure access point",
+          "data": {
+            "name": "Name",
+            "router_brand": "Brand"
+          },
+          "data_description": {
+            "name": "How this access point appears in the device table, e.g. the room it covers.",
+            "router_brand": "Pick the brand to poll it for connected devices. None declares that the access point exists without polling it — enough for the integration to stop reporting its wireless clients as wired."
+          }
+        },
+        "credentials": {
+          "title": "Access point details",
+          "description": "Connection details for this {brand} access point.",
+          "data": {
+            "router_host": "Access point address",
+            "router_username": "Username",
+            "router_password": "Admin password"
+          },
+          "data_description": {
+            "router_host": "IP address of the access point on your network.",
+            "router_username": "The username its web interface expects.",
+            "router_password": "Its admin (web UI) password."
+          }
+        }
+      },
+      "error": {
+        "name_required": "Give this access point a name.",
+        "invalid_host": "Enter the access point address.",
+        "username_required": "This brand needs a username.",
+        "password_required": "This brand needs the admin password.",
+        "invalid_auth": "The access point rejected the credentials.",
+        "cannot_connect": "Could not reach the access point at this address.",
+        "unknown_brand": "This brand is not available."
+      },
+      "abort": {
+        "reconfigure_successful": "Access point updated."
+      }
+    }
   }
 }

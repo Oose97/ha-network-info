@@ -8,9 +8,12 @@ Every interval (and on every manual refresh) the coordinator runs the same seque
    MAC, OUI vendor and reverse-DNS hostname.
 2. **Router poll** (when configured) — the router's full client list: wired and
    wireless, online and offline, with connection path, signal and the router's device
-   names.
+   names. Any configured access points are polled at the same time, each one
+   independently: a router that is down delays nothing and fails nothing else.
 3. **Merge by MAC** — scan and router views of the same device become one record;
-   a record seen by only one source keeps what that source knew.
+   a record seen by only one source keeps what that source knew. Where they
+   disagree about the path, the access point holding the association outranks
+   the gateway, which only sees the traffic arrive over a wire.
 4. **Memory fold** — the merged cycle updates the persistent memory, and remembered
    devices missing from the cycle are appended as offline rows.
 5. **Registry enrichment** — every MAC is looked up in Home Assistant's device
@@ -51,8 +54,11 @@ for the table to be complete.
   remembering a device does not count as seeing it.
 - Devices absent from the current cycle are served from memory as offline rows with
   `sources: ["memory"]` — in scan-only mode just the same as with a router.
-- Scan-only cycles cannot see paths, so the last known path is kept on display rather
-  than reset to Unknown.
+- Offline rows keep the last path and access point the device was known on.
+- A remembered path only stands in while nothing could observe one — scan-only
+  cycles, or a router that could not be reached. Once a router answers and does
+  not place an online device, that device reads Unknown: a stale label is not
+  allowed to outlive the truth.
 - `network_info.forget_device` deletes a record; removing the config entry deletes the
   store.
 
