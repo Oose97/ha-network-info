@@ -164,7 +164,9 @@ class TechnicolorProvider(RouterProvider):
             resp.raise_for_status()
             return await resp.text()
         except (ClientError, TimeoutError) as err:
-            raise RouterConnectionError(f"Request to gateway failed: {err}") from err
+            raise RouterConnectionError(
+                f"Request to gateway failed: {err or type(err).__name__}"
+            ) from err
 
     async def _post(self, path: str, data: dict[str, str]) -> str:
         try:
@@ -179,7 +181,9 @@ class TechnicolorProvider(RouterProvider):
             resp.raise_for_status()
             return await resp.text()
         except (ClientError, TimeoutError) as err:
-            raise RouterConnectionError(f"Request to gateway failed: {err}") from err
+            raise RouterConnectionError(
+                f"Request to gateway failed: {err or type(err).__name__}"
+            ) from err
 
     async def async_login(self) -> None:
         """Run the SRP-6 handshake against the gateway's web UI."""

@@ -103,7 +103,9 @@ class TPLinkProvider(RouterProvider):
             resp.raise_for_status()
             text = await resp.text()
         except (ClientError, TimeoutError) as err:
-            raise RouterConnectionError(f"Request to router failed: {err}") from err
+            raise RouterConnectionError(
+                f"Request to router failed: {err or type(err).__name__}"
+            ) from err
         try:
             payload = json.loads(text)
         except json.JSONDecodeError as err:
@@ -166,6 +168,24 @@ class TPLinkProvider(RouterProvider):
         password_key = _rsa_key(keys_payload)
         sign_key = _rsa_key(auth_payload, field="key")
         sequence = _to_int((auth_payload.get("data") or {}).get("seq"))
+        # The public key material is not secret, and its exact shape is what
+        # decides how the password must be encoded — worth seeing in full when
+        # a firmware refuses a login for reasons it will not name.
+        _LOGGER.debug("TP-Link ?form=keys replied: %s", str(keys_payload)[:400])
+        _LOGGER.debug("TP-Link ?form=auth replied: %s", str(auth_payload)[:400])
+        if password_key:
+            _LOGGER.debug(
+                "Password key: %d-bit modulus, exponent %d",
+                password_key[0].bit_length(),
+                password_key[1],
+            )
+        if sign_key:
+            _LOGGER.debug(
+                "Sign key: %d-bit modulus, exponent %d, seq %s",
+                sign_key[0].bit_length(),
+                sign_key[1],
+                sequence,
+            )
 
         if sign_key is not None and sequence is not None and _aes_encryptor():
             return "signed", password_key, auth_payload
