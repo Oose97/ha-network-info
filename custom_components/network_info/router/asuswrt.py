@@ -13,7 +13,9 @@ is currently online — so no second endpoint or heuristics are needed.
 from __future__ import annotations
 
 import base64
+import json
 import logging
+import re
 from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
@@ -36,6 +38,8 @@ _LOGGER = logging.getLogger(__name__)
 _TIMEOUT = ClientTimeout(total=20)
 # ASUSWRT rejects requests that do not look like they came from its own UI.
 _UA = "Mozilla/5.0 (compatible; HomeAssistant Network Info)"
+_TOKEN_RE = re.compile(r"asus_token\s*[=:]\s*['\"]?([A-Za-z0-9._~+/-]{8,})")
+_ERROR_RE = re.compile(r"error_status\s*[=:]\s*['\"]?(\d+)")
 
 # isWL: 0 wired, 1 the 2.4 GHz radio, 2 and 3 the 5 GHz radios.
 _BAND_BY_ISWL = {
@@ -89,10 +93,25 @@ class AsusWrtProvider(RouterProvider):
         except (ClientError, TimeoutError) as err:
             raise RouterConnectionError(f"Login request failed: {err}") from err
 
-        token = _extract_token(body)
+        # Where the token lands depends on the firmware: a JSON body, a
+        # Set-Cookie header, or embedded in an HTML redirect page. The cookie
+        # is read from the response directly rather than from the shared
+        # session jar, which discards cookies set by a bare-IP host.
+        token = _token_from_json(body)
         if not token:
-            # The router answers 200 with an error page for a bad password.
-            raise RouterAuthError("Router did not return a session token")
+            morsel = resp.cookies.get("asus_token")
+            token = morsel.value if morsel else None
+        if not token:
+            token = _token_from_body(body)
+
+        if not token:
+            reason = _login_error(body)
+            _LOGGER.debug(
+                "ASUSWRT login gave no token (HTTP %s): %s",
+                resp.status,
+                body[:200].replace("\n", " "),
+            )
+            raise RouterAuthError(reason)
         self._token = token
         _LOGGER.debug("Logged in to ASUSWRT router")
 
@@ -143,19 +162,35 @@ class AsusWrtProvider(RouterProvider):
         return _loads(text)
 
 
-def _extract_token(body: str) -> str | None:
+def _token_from_json(body: str) -> str | None:
     data = _loads(body)
-    if data:
-        token = data.get("asus_token")
-        if token:
-            return str(token)
-    return None
+    token = data.get("asus_token") if data else None
+    return str(token) if token else None
+
+
+def _token_from_body(body: str) -> str | None:
+    """Some firmware only echoes the token inside the redirect page."""
+    match = _TOKEN_RE.search(body)
+    return match.group(1) if match else None
+
+
+def _login_error(body: str) -> str:
+    """Turn ASUSWRT's error_status into something worth reading."""
+    match = _ERROR_RE.search(body)
+    status = match.group(1) if match else None
+    return {
+        "2": "Router rejected the username",
+        "3": "Router rejected the password",
+        "7": (
+            "Router has locked out logins after too many failed attempts — "
+            "wait for the lockout to expire, then try again"
+        ),
+        "8": "Router refused a login from this address",
+    }.get(status or "", "Router did not return a session token")
 
 
 def _loads(text: str) -> dict[str, Any] | None:
     """ASUSWRT emits not-quite-JSON at times (unquoted keys, trailing commas)."""
-    import json
-
     text = text.strip()
     if not text or text[0] not in "{[":
         return None
