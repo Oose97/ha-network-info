@@ -117,6 +117,50 @@ read at all, paths stay unknown rather than claiming everything is wired.
 
 Per-device signal is only available for stations the gateway itself serves.
 
+## OpenWrt / Cudy (ubus)
+
+For OpenWrt and the vendor firmwares derived from it, including Cudy hardware
+such as the AP1300. Everything goes over the `/ubus` JSON-RPC endpoint: a
+session login, then `iwinfo` for the radios and their associated stations.
+
+This is the cleanest source available. `iwinfo assoclist` returns the stations
+actually associated to each radio with their signal, and the radio's own
+frequency states the band — no scraping, no heuristics. DHCP leases add IPs
+and hostnames for wired clients; an access point normally has none, which is
+expected and harmless.
+
+Requires ubus to be reachable over HTTP (`uhttpd-mod-ubus`, shipped with
+LuCI). Vendor builds that strip it cannot be polled this way. The username is
+usually `root`.
+
+## ASUS (ASUSWRT)
+
+For ASUS routers on ASUSWRT or Merlin firmware (RT series, e.g. the RT-AC65P).
+Login posts a base64 `user:password` to `login.cgi`; a single
+`appGet.cgi?hook=get_clientlist()` call then returns every client the router
+knows.
+
+That one call is unusually complete: each client states its band outright
+(wired, 2.4 GHz, or one of the 5 GHz radios), its RSSI, and whether it is
+online — so nothing has to be inferred.
+
+## TP-Link Archer
+
+For the consumer Archer line (C6, C7, A7 and relatives). These have no
+username field — a password alone logs you in — but the way that password is
+transmitted changed across firmware generations, and a given model may ship
+any of them. Three variants are attempted in turn, cheapest first: the
+base64 password, an RSA-encrypted password, and an AES payload with an RSA
+signature. Whichever the router accepts is remembered for later logins.
+
+Clients come from `admin/status?form=client_status`, whose entries carry a
+`wire_type` of `wired`, `2.4G` or `5G` — the band, stated directly — with the
+wireless statistics page as a fallback.
+
+The signed variant needs AES, taken from `cryptography` (a Home Assistant
+dependency, so present in every install); if it were missing that one variant
+is skipped rather than the provider failing.
+
 ## Adding a brand
 
 1. Add a module in `router/` implementing `RouterProvider` for that brand's API.

@@ -16,8 +16,8 @@ device also gets its connection path, signal level and the router's name for it.
   via the scan ([details](docs/scanning.md)).
 - **Connection path per device** — LAN / 2.4 GHz / 5 GHz / guest, plus signal level,
   read from the router's own API. Router brands are pluggable providers behind one
-  interface; Xiaomi/MiWiFi and Technicolor (Homeware) are implemented
-  ([details](docs/routers.md)).
+  interface; Xiaomi/MiWiFi, Technicolor (Homeware), OpenWrt/Cudy, ASUSWRT and
+  TP-Link Archer are implemented ([details](docs/routers.md)).
 - **Downstream access points are first-class** — add each one to the same entry and its
   wireless clients are reported as wireless, on the access point serving them, instead
   of the wired connection the main router necessarily sees. An access point can also be
@@ -54,7 +54,8 @@ and router address come pre-filled — see [Setup](docs/setup.md).
 
 Requires Home Assistant 2025.3+ and the `nmap` executable (bundled with Home Assistant
 OS and Container images). Connection-path info needs a supported router —
-Xiaomi/MiWiFi or Technicolor (Homeware) — and its admin credentials.
+Xiaomi/MiWiFi, Technicolor (Homeware), OpenWrt/Cudy, ASUSWRT or TP-Link Archer — and
+its admin credentials.
 
 ## Documentation
 
@@ -105,8 +106,8 @@ Go to [Router providers](docs/routers.md) for more details.
   the brand's default gateway, HTTPS default and which credentials it needs, so the
   router step comes pre-filled and only asks for what the brand requires.
 - Providers implement one interface (`async_get_clients`, keyed by MAC); the rest of
-  the integration is brand-agnostic. Xiaomi/MiWiFi and Technicolor (Homeware) ship
-  today; adding a brand is one module plus one catalog entry.
+  the integration is brand-agnostic. Five brands ship today; adding another is one
+  module plus one catalog entry.
 
 ### Cards
 

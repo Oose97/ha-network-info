@@ -76,6 +76,9 @@ jobs:
           import custom_components.network_info.cards
           import custom_components.network_info.router.xiaomi_miwifi
           import custom_components.network_info.router.technicolor
+          import custom_components.network_info.router.openwrt
+          import custom_components.network_info.router.asuswrt
+          import custom_components.network_info.router.tplink
           import custom_components.network_info.router.srp6
           print('all modules import cleanly')
           "

@@ -124,7 +124,9 @@ def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema
     if spec.get("requires_username"):
         fields[
             vol.Required(
-                CONF_ROUTER_USERNAME, default=defaults.get(CONF_ROUTER_USERNAME, "")
+                CONF_ROUTER_USERNAME,
+                default=defaults.get(CONF_ROUTER_USERNAME)
+                or spec.get("default_username", ""),
             )
         ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
     if spec.get("requires_password"):

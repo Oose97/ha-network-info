@@ -4,6 +4,7 @@
       "id": "xiaomi_miwifi",
       "name": "Xiaomi / MiWiFi",
       "default_gateway": "192.168.31.1",
+      "default_username": "admin",
       "requires_username": false,
       "requires_password": true,
       "default_https": true,
@@ -13,10 +14,41 @@
       "id": "technicolor",
       "name": "Technicolor (Homeware)",
       "default_gateway": "192.168.1.254",
+      "default_username": "admin",
       "requires_username": true,
       "requires_password": true,
       "default_https": false,
       "api_endpoint": "{gateway}/modals/device-modal.lp"
+    },
+    {
+      "id": "openwrt",
+      "name": "OpenWrt / Cudy (ubus)",
+      "default_gateway": "192.168.1.1",
+      "default_username": "root",
+      "requires_username": true,
+      "requires_password": true,
+      "default_https": false,
+      "api_endpoint": "{gateway}/ubus"
+    },
+    {
+      "id": "asuswrt",
+      "name": "ASUS (ASUSWRT)",
+      "default_gateway": "192.168.1.1",
+      "default_username": "admin",
+      "requires_username": true,
+      "requires_password": true,
+      "default_https": false,
+      "api_endpoint": "{gateway}/appGet.cgi"
+    },
+    {
+      "id": "tplink",
+      "name": "TP-Link Archer",
+      "default_gateway": "192.168.0.1",
+      "default_username": "admin",
+      "requires_username": false,
+      "requires_password": true,
+      "default_https": false,
+      "api_endpoint": "{gateway}/cgi-bin/luci"
     }
   ]
 }
