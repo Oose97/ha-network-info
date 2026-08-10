@@ -83,6 +83,34 @@ The config flow reads the catalog for its dropdown (with **None (scanning only)*
 the default choice) and pre-fills the router step from the selected entry; only the
 credential fields the brand requires are shown.
 
+## Technicolor (Homeware)
+
+For ISP-supplied Technicolor gateways running Homeware firmware (DGA/TG "ac"
+models). Authentication is the gateway's SRP-6 handshake, implemented without
+extra dependencies; the session cookie and the `X-Requested-With` / `Referer`
+headers its AJAX endpoints expect are handled explicitly.
+
+Two modals are read, mirroring the two-endpoint pattern:
+
+- `device-modal.lp` — every device the gateway knows, with hostname, IPv4 and
+  MAC. This list includes devices that are **not currently connected**, so a
+  row counts as online only when an explicit state column says so, or — when
+  the build has no such column — when the device holds a current lease. A row
+  with no IP is a remembered device, not a connected one.
+- `wireless-modal.lp` — the currently associated stations per radio, which is
+  where the band (2.4 GHz / 5 GHz / guest) and signal come from. Layouts vary
+  a lot between builds, so each station's band is taken from the nearest
+  preceding radio heading rather than an assumed column.
+
+An online device absent from the wireless list is reported as **LAN**, because
+that is how the gateway sees it. Note this covers devices behind a downstream
+access point or switch too: they reach the gateway over a wired port, so the
+gateway cannot tell they are wireless further out. On a network with extra
+access points, expect their clients to read LAN. When no wireless list can be
+read at all, paths stay unknown rather than claiming everything is wired.
+
+Per-device signal is only available for stations the gateway itself serves.
+
 ## Adding a brand
 
 1. Add a module in `router/` implementing `RouterProvider` for that brand's API.

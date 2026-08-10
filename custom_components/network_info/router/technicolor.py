@@ -50,6 +50,12 @@ _CSRF_RE = re.compile(
 )
 _MAC_RE = re.compile(r"([0-9a-f]{2}(?::[0-9a-f]{2}){5})", re.IGNORECASE)
 _IPV4_RE = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
+# Radio markers as they appear in wireless-modal headings and interface names.
+_BAND_RE = re.compile(
+    r"\b(?:5\s?GHz|2[.,]4\s?GHz|guest|wl[0-9])\b", re.IGNORECASE
+)
+# "-58 dBm", "58 dBm", "Signal: 75%".
+_SIGNAL_RE = re.compile(r"(-?\d{1,3})\s*(?:dBm|%)", re.IGNORECASE)
 
 
 def _classify(text: str) -> str | None:
@@ -219,7 +225,39 @@ class TechnicolorProvider(RouterProvider):
             # Some builds serve an empty modal until this alternate is hit.
             content = await self._get("/modals/ipv6devices-modal.lp")
             clients = _parse_device_modal(content)
+
+        # The device modal knows who exists, not how they are attached — many
+        # builds carry no interface column at all. The wireless modal lists the
+        # currently associated stations per radio, which is where the band and
+        # signal come from; anything online and absent from it is reached over
+        # a wired port (from the gateway's point of view — a device behind a
+        # downstream access point or switch is wired as far as it can tell).
+        wireless = await self._async_wireless_stations()
+        for mac, client in clients.items():
+            station = wireless.get(mac)
+            if station is not None:
+                band, signal = station
+                if band:
+                    client.connection = band
+                client.signal = signal
+                client.online = True
+            elif client.online and client.connection is None:
+                client.connection = CONNECTION_LAN if wireless else None
         return clients
+
+    async def _async_wireless_stations(self) -> dict[str, tuple[str | None, int | None]]:
+        """Associated wireless stations, keyed by MAC. Empty when unavailable."""
+        for path in ("/modals/wireless-modal.lp", "/modals/wirelessstats-modal.lp"):
+            try:
+                content = await self._get(path)
+            except RouterConnectionError:
+                continue
+            stations = _parse_wireless_modal(content)
+            if stations:
+                _LOGGER.debug("Found %d wireless stations via %s", len(stations), path)
+                return stations
+        _LOGGER.debug("No wireless station list available; paths stay unknown")
+        return {}
 
 
 def _parse_json(text: str) -> dict[str, Any]:
@@ -273,7 +311,12 @@ def _from_table(rows: list[list[str]]) -> dict[str, RouterClient]:
         return {}
     name_i = find("hostname", "name", "device")
     ip_i = find("ipv4", "ip address", "ip")
-    path_i = find("interface", "connected", "access point", "link", "network")
+    path_i = find("interface", "connected via", "access point", "link", "radio", "band")
+    state_i = find("state", "status", "active", "online")
+    _LOGGER.debug(
+        "Device modal headers %s (mac=%s ip=%s name=%s path=%s state=%s)",
+        header, mac_i, ip_i, name_i, path_i, state_i,
+    )
 
     clients: dict[str, RouterClient] = {}
     for row in rows[1:]:
@@ -289,15 +332,37 @@ def _from_table(rows: list[list[str]]) -> dict[str, RouterClient]:
             if path_i is not None and path_i < len(row)
             else None
         )
+        # The modal lists every device the gateway has ever seen. An explicit
+        # state column decides when present; otherwise the absence of a current
+        # lease (no IP) is what distinguishes a remembered device from a
+        # connected one.
+        if state_i is not None and state_i < len(row):
+            online = _state_is_online(row[state_i])
+            if online is None:
+                online = bool(ip)
+        else:
+            online = bool(ip)
         clients[mac] = RouterClient(
             mac=mac,
             ip=ip,
             name=name or None,
             connection=conn,
             signal=None,
-            online=True,
+            online=online,
         )
     return clients
+
+
+def _state_is_online(text: str) -> bool | None:
+    """Read a state/status cell; None when it says nothing useful."""
+    t = text.strip().lower()
+    if not t:
+        return None
+    if any(k in t for k in ("disconnect", "inactive", "offline", "not connected")):
+        return False
+    if any(k in t for k in ("connected", "active", "online", "yes", "true")):
+        return True
+    return None
 
 
 def _from_scan(content: str) -> dict[str, RouterClient]:
@@ -308,15 +373,60 @@ def _from_scan(content: str) -> dict[str, RouterClient]:
         if not mac or mac in clients:
             continue
         window = content[max(0, m.start() - 400) : m.end() + 400]
+        ip = _first_ip(window)
         clients[mac] = RouterClient(
             mac=mac,
-            ip=_first_ip(window),
+            ip=ip,
             name=None,
             connection=_classify(window),
             signal=None,
-            online=True,
+            online=bool(ip),
         )
     return clients
+
+
+def _parse_wireless_modal(content: str) -> dict[str, tuple[str | None, int | None]]:
+    """Associated stations from the wireless modal, keyed by MAC.
+
+    Layout varies far more than the device modal, so rather than assuming
+    columns this walks each MAC and reads the nearest preceding radio heading
+    for the band plus any signal figure alongside it.
+    """
+    stations: dict[str, tuple[str | None, int | None]] = {}
+    for m in _MAC_RE.finditer(content):
+        mac = normalize_mac(m.group(1))
+        if not mac or mac in stations:
+            continue
+        before = content[max(0, m.start() - 2000) : m.start()]
+        after = content[m.end() : m.end() + 300]
+        stations[mac] = (_band_from_context(before, after), _signal_from(after))
+    return stations
+
+
+def _band_from_context(before: str, after: str) -> str | None:
+    """Nearest preceding radio marker wins; the trailing context is a fallback."""
+    for text, reverse in ((before, True), (after, False)):
+        hits = [
+            (m.start(), m.group(0).lower())
+            for m in _BAND_RE.finditer(text)
+        ]
+        if not hits:
+            continue
+        _, marker = hits[-1] if reverse else hits[0]
+        band = _classify(marker)
+        if band:
+            return band
+    return None
+
+
+def _signal_from(text: str) -> int | None:
+    m = _SIGNAL_RE.search(text)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
 
 
 def _first_mac(text: str) -> str | None:
