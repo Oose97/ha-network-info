@@ -8,6 +8,15 @@
       "requires_password": true,
       "default_https": true,
       "api_endpoint": "{gateway}/cgi-bin/luci/api"
+    },
+    {
+      "id": "technicolor",
+      "name": "Technicolor (Homeware)",
+      "default_gateway": "192.168.1.254",
+      "requires_username": true,
+      "requires_password": true,
+      "default_https": false,
+      "api_endpoint": "{gateway}/modals/device-modal.lp"
     }
   ]
 }
