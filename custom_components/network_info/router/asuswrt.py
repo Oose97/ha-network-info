@@ -91,7 +91,9 @@ class AsusWrtProvider(RouterProvider):
             )
             body = await resp.text()
         except (ClientError, TimeoutError) as err:
-            raise RouterConnectionError(f"Login request failed: {err}") from err
+            raise RouterConnectionError(
+                f"Login request failed: {err or type(err).__name__}"
+            ) from err
 
         # Where the token lands depends on the firmware: a JSON body, a
         # Set-Cookie header, or embedded in an HTML redirect page. The cookie
@@ -158,7 +160,9 @@ class AsusWrtProvider(RouterProvider):
             resp.raise_for_status()
             text = await resp.text()
         except (ClientError, TimeoutError) as err:
-            raise RouterConnectionError(f"Request to router failed: {err}") from err
+            raise RouterConnectionError(
+                f"Request to router failed: {err or type(err).__name__}"
+            ) from err
         return _loads(text)
 
 

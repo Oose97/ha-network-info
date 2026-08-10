@@ -121,9 +121,16 @@ def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema
     normally needs no username still offers one, because firmware revisions
     differ on that, and the transport is a plain toggle for the same reason.
     """
-    username_default = defaults.get(CONF_ROUTER_USERNAME) or spec.get(
-        "default_username", ""
-    )
+    # A field the user has already touched keeps what they put there, even
+    # when that is deliberately empty — the catalog default only fills a field
+    # that has never been submitted, or a re-shown form would keep reinstating
+    # a value the user just cleared.
+    username_default = defaults.get(CONF_ROUTER_USERNAME)
+    if username_default is None:
+        username_default = spec.get("default_username", "")
+    host_default = defaults.get(CONF_ROUTER_HOST)
+    if host_default is None:
+        host_default = spec.get("default_gateway", "")
     username_key = (
         vol.Required(CONF_ROUTER_USERNAME, default=username_default)
         if spec.get("requires_username")
@@ -141,11 +148,9 @@ def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema
         https_default = bool(spec.get("default_https"))
     return vol.Schema(
         {
-            vol.Required(
-                CONF_ROUTER_HOST,
-                default=defaults.get(CONF_ROUTER_HOST)
-                or spec.get("default_gateway", ""),
-            ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
+            vol.Required(CONF_ROUTER_HOST, default=host_default): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.TEXT)
+            ),
             username_key: TextSelector(
                 TextSelectorConfig(type=TextSelectorType.TEXT)
             ),
