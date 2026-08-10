@@ -35,8 +35,13 @@ that brand actually needs are shown:
 | Field | Meaning |
 |---|---|
 | Router address | Pre-filled with the brand's usual gateway address; adjust if yours differs. |
-| Router username | Only shown for brands that need one. |
-| Router admin password | Only shown for brands that need one. |
+| Router username | Pre-filled with what the brand normally expects, and required only for brands that need one — but always offered, since firmware revisions differ. |
+| Router admin password | Required for brands that need one. |
+| Connect over HTTPS | Pre-set to what the brand normally uses. Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP; self-signed certificates are accepted. |
+
+Everything the catalog supplies is a starting point, not a rule — each field
+stays editable, because the same model can behave differently across firmware
+revisions.
 
 The credentials are verified against the router before the entry is created:
 

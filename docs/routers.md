@@ -74,9 +74,10 @@ brand:
 | `id` | Internal brand id; maps to the provider class. |
 | `name` | Label shown in the config flow dropdown. |
 | `default_gateway` | Pre-fills the router address field. |
-| `requires_username` | Whether the flow shows a username field. |
+| `default_username` | Pre-fills the username field. |
+| `requires_username` | Whether a username is *required*. The field is always shown, since firmware revisions differ on this. |
 | `requires_password` | Whether the flow shows a password field. |
-| `default_https` | Start talking HTTPS (self-signed certs accepted). Providers fall back to HTTP when the router has no TLS listener, and upgrade to HTTPS when the router redirects — either way both firmware generations work. |
+| `default_https` | Whether to start on HTTPS (self-signed certs accepted). This only pre-sets the form's toggle, which the user can change; providers additionally fall back to HTTP when the router has no TLS listener, and upgrade to HTTPS when the router redirects. |
 | `api_endpoint` | The API base shape, for reference and for providers that build URLs from it. |
 
 The config flow reads the catalog for its dropdown (with **None (scanning only)** as

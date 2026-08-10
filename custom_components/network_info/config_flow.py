@@ -115,27 +115,48 @@ def _base_schema(
 
 
 def _router_schema(defaults: dict[str, Any], spec: dict[str, Any]) -> vol.Schema:
-    fields: dict[Any, Any] = {
-        vol.Required(
-            CONF_ROUTER_HOST,
-            default=defaults.get(CONF_ROUTER_HOST) or spec.get("default_gateway", ""),
-        ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
-    }
-    if spec.get("requires_username"):
-        fields[
+    """The connection form for one router.
+
+    The catalog seeds the defaults; every field stays editable. A brand that
+    normally needs no username still offers one, because firmware revisions
+    differ on that, and the transport is a plain toggle for the same reason.
+    """
+    username_default = defaults.get(CONF_ROUTER_USERNAME) or spec.get(
+        "default_username", ""
+    )
+    username_key = (
+        vol.Required(CONF_ROUTER_USERNAME, default=username_default)
+        if spec.get("requires_username")
+        else vol.Optional(CONF_ROUTER_USERNAME, default=username_default)
+    )
+    password_key = (
+        vol.Required(CONF_ROUTER_PASSWORD, default=defaults.get(CONF_ROUTER_PASSWORD, ""))
+        if spec.get("requires_password")
+        else vol.Optional(
+            CONF_ROUTER_PASSWORD, default=defaults.get(CONF_ROUTER_PASSWORD, "")
+        )
+    )
+    https_default = defaults.get(CONF_ROUTER_USE_HTTPS)
+    if https_default is None:
+        https_default = bool(spec.get("default_https"))
+    return vol.Schema(
+        {
             vol.Required(
-                CONF_ROUTER_USERNAME,
-                default=defaults.get(CONF_ROUTER_USERNAME)
-                or spec.get("default_username", ""),
-            )
-        ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
-    if spec.get("requires_password"):
-        fields[
+                CONF_ROUTER_HOST,
+                default=defaults.get(CONF_ROUTER_HOST)
+                or spec.get("default_gateway", ""),
+            ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
+            username_key: TextSelector(
+                TextSelectorConfig(type=TextSelectorType.TEXT)
+            ),
+            password_key: TextSelector(
+                TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
             vol.Required(
-                CONF_ROUTER_PASSWORD, default=defaults.get(CONF_ROUTER_PASSWORD, "")
-            )
-        ] = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
-    return vol.Schema(fields)
+                CONF_ROUTER_USE_HTTPS, default=bool(https_default)
+            ): BooleanSelector(),
+        }
+    )
 
 
 def _ap_schema(
@@ -198,7 +219,10 @@ async def _check_router(
     host = (user_input.get(CONF_ROUTER_HOST) or "").strip()
     username = (user_input.get(CONF_ROUTER_USERNAME) or "").strip()
     password = user_input.get(CONF_ROUTER_PASSWORD) or ""
-    use_https = bool(spec.get("default_https"))
+    # The catalog only supplies the default; what the form says wins.
+    use_https = bool(
+        user_input.get(CONF_ROUTER_USE_HTTPS, spec.get("default_https"))
+    )
 
     if not host:
         errors[CONF_ROUTER_HOST] = "invalid_host"
