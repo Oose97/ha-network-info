@@ -23,6 +23,17 @@ CONF_ROUTER_USERNAME = "router_username"
 CONF_ROUTER_PASSWORD = "router_password"
 CONF_ROUTER_USE_HTTPS = "router_https"
 ROUTER_BRAND_NONE = "none"
+
+# Access points are config subentries: a hub entry plus one child per AP, so
+# they can be added, edited and removed one at a time.
+SUBENTRY_TYPE_ACCESS_POINT = "access_point"
+CONF_AP_NAME = "name"
+
+ROLE_GATEWAY = "gateway"
+ROLE_ACCESS_POINT = "access_point"
+
+# Shown as the serving access point for devices the main router handles itself.
+LABEL_MAIN_ROUTER = "Main router"
 CONF_EXTERNAL_IP = "external_ip"
 CONF_EXTERNAL_IP_LOG = "external_ip_log"
 
@@ -67,6 +78,7 @@ ATTR_COUNTS = "counts"
 ATTR_HA_IP = "ha_ip"
 ATTR_ROUTER_AVAILABLE = "router_available"
 ATTR_ROUTER_MODEL = "router_model"
+ATTR_ACCESS_POINTS = "access_points"
 ATTR_LAST_SCAN = "last_scan"
 ATTR_IP_LOG = "log"
 

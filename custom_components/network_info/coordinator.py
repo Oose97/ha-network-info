@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
@@ -23,6 +24,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_AP_NAME,
     CONF_EXTERNAL_IP,
     CONF_EXTERNAL_IP_LOG,
     CONF_IP_RANGE,
@@ -40,8 +42,12 @@ from .const import (
     DOMAIN,
     EXTERNAL_IP_URL,
     IP_LOG_MAX_ROWS,
+    LABEL_MAIN_ROUTER,
+    ROLE_ACCESS_POINT,
+    ROLE_GATEWAY,
     ROUTER_BRAND_NONE,
     STORAGE_VERSION,
+    SUBENTRY_TYPE_ACCESS_POINT,
     WIFI_CONNECTIONS,
     ip_log_storage_key,
     storage_key,
@@ -67,9 +73,39 @@ class NetworkData:
     ha_ip: str | None = None
     router_available: bool | None = None  # None = no router configured
     router_model: str | None = None
+    access_points: list[dict[str, Any]] = field(default_factory=list)
     last_scan: datetime | None = None
     external_ip: str | None = None  # None = tracking disabled or not yet known
     ip_log: list[dict[str, str]] | None = None  # None = logging disabled
+
+
+@dataclass
+class _Source:
+    """One router this integration polls: the gateway, or an access point."""
+
+    name: str
+    brand: str
+    role: str
+    provider: RouterProvider | None  # None = declared but not polled
+    polled: bool = False
+
+    @property
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "brand": self.brand,
+            "managed": self.provider is not None,
+            "available": self.polled if self.provider is not None else None,
+        }
+
+
+@dataclass
+class _Station:
+    """A wireless association claimed by one access point."""
+
+    band: str
+    signal: int | None
+    ap_name: str
 
 
 class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
@@ -86,7 +122,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             update_interval=timedelta(minutes=minutes),
         )
         self._ip_range: str = config[CONF_IP_RANGE]
-        self._provider: RouterProvider | None = None
+        session = async_get_clientsession(hass)
         router_host = (config.get(CONF_ROUTER_HOST) or "").strip()
         router_password = config.get(CONF_ROUTER_PASSWORD) or ""
         brand = config.get(CONF_ROUTER_BRAND)
@@ -97,18 +133,55 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         # The device at this address IS the router — known from config even
         # without API access, so it can be labeled regardless.
         self._router_ip = router_host.split("://")[-1].split("/")[0].split(":")[0]
+
+        gateway_provider: RouterProvider | None = None
         if brand != ROUTER_BRAND_NONE and router_host:
-            self._provider = create_provider(
+            gateway_provider = create_provider(
                 brand,
                 router_host,
                 (config.get(CONF_ROUTER_USERNAME) or "").strip(),
                 router_password,
-                async_get_clientsession(hass),
+                session,
                 bool(config.get(CONF_ROUTER_USE_HTTPS)),
             )
-            if self._provider is None:
+            if gateway_provider is None:
                 _LOGGER.warning("Unknown router brand %r — running scan-only", brand)
-        self._router_warned = False
+        self._gateway = _Source(
+            name=LABEL_MAIN_ROUTER,
+            brand=brand,
+            role=ROLE_GATEWAY,
+            provider=gateway_provider,
+        )
+
+        # One subentry per downstream access point. A subentry whose brand is
+        # "none" declares that an AP exists without giving credentials for it —
+        # enough to know the gateway's wired/wireless view is incomplete.
+        self._access_points: list[_Source] = []
+        for sub in entry.subentries.values():
+            if sub.subentry_type != SUBENTRY_TYPE_ACCESS_POINT:
+                continue
+            data = dict(sub.data)
+            ap_brand = data.get(CONF_ROUTER_BRAND, ROUTER_BRAND_NONE)
+            ap_host = (data.get(CONF_ROUTER_HOST) or "").strip()
+            provider: RouterProvider | None = None
+            if ap_brand != ROUTER_BRAND_NONE and ap_host:
+                provider = create_provider(
+                    ap_brand,
+                    ap_host,
+                    (data.get(CONF_ROUTER_USERNAME) or "").strip(),
+                    data.get(CONF_ROUTER_PASSWORD) or "",
+                    session,
+                    bool(data.get(CONF_ROUTER_USE_HTTPS)),
+                )
+            self._access_points.append(
+                _Source(
+                    name=data.get(CONF_AP_NAME) or sub.title,
+                    brand=ap_brand,
+                    role=ROLE_ACCESS_POINT,
+                    provider=provider,
+                )
+            )
+        self._warned: set[str] = set()
         # Every device ever seen, keyed by MAC (ip:<ip> before the MAC is
         # known). This is the integration's own memory — offline devices stay
         # listed even in scan-only mode; the router only enriches it.
@@ -139,37 +212,34 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         except ScannerError as err:
             raise UpdateFailed(str(err)) from err
 
-        router_clients: dict[str, RouterClient] = {}
-        router_available: bool | None = None
-        if self._provider is not None:
-            try:
-                router_clients = await self._provider.async_get_clients()
-                router_available = True
-                if self._router_warned:
-                    self._router_warned = False
-                    _LOGGER.info("Router connection recovered")
-            except RouterAuthError as err:
-                router_available = False
-                if not self._router_warned:
-                    self._router_warned = True
-                    _LOGGER.warning(
-                        "Router rejected credentials, connection paths unavailable: %s", err
-                    )
-            except RouterError as err:
-                router_available = False
-                if not self._router_warned:
-                    self._router_warned = True
-                    _LOGGER.warning(
-                        "Router unreachable, connection paths unavailable: %s", err
-                    )
+        # Every router is polled concurrently and independently: one that is
+        # down must not delay or fail the others, nor the scan.
+        results = await asyncio.gather(
+            *(
+                self._async_poll(source)
+                for source in (self._gateway, *self._access_points)
+            )
+        )
+        router_clients = results[0]
+        ap_stations = self._collect_stations(results[1:])
 
-        devices = self._merge(scanned, router_clients)
+        # The gateway sees a device behind an access point as wired, because
+        # that is how it arrives. Its "LAN" verdict is therefore only
+        # trustworthy once every declared access point has been asked and none
+        # of them claims the device.
+        lan_trustworthy = all(ap.polled for ap in self._access_points)
+        devices = self._merge(scanned, router_clients, ap_stations, lan_trustworthy)
         if self._router_ip:
             for device in devices:
                 if device["ip"] == self._router_ip:
                     device["connection"] = CONNECTION_ROUTER
                     break
-        self._apply_memory(devices)
+        # A remembered path may only stand in when nothing could observe one
+        # this cycle; otherwise an old value would outlive the truth.
+        paths_observed = self._gateway.polled or any(
+            ap.polled for ap in self._access_points
+        )
+        self._apply_memory(devices, paths_observed)
         self._enrich_from_registries(devices)
         devices.sort(key=_ip_sort_key)
 
@@ -187,12 +257,69 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             devices=devices,
             counts=counts,
             ha_ip=ha_ip,
-            router_available=router_available,
-            router_model=self._provider.model if self._provider else None,
+            router_available=(
+                self._gateway.polled if self._gateway.provider is not None else None
+            ),
+            router_model=(
+                self._gateway.provider.model if self._gateway.provider else None
+            ),
+            access_points=[ap.as_dict for ap in self._access_points],
             last_scan=dt_util.utcnow(),
             external_ip=self._external_ip if self._track_external_ip else None,
             ip_log=list(self._ip_log or []) if self._log_external_ip else None,
         )
+
+    async def _async_poll(self, source: _Source) -> dict[str, RouterClient]:
+        """Poll one router. Never raises — a failure is just no data from it."""
+        source.polled = False
+        if source.provider is None:
+            return {}
+        try:
+            clients = await source.provider.async_get_clients()
+        except RouterAuthError as err:
+            self._warn_once(source, f"rejected the credentials: {err}")
+            return {}
+        except RouterError as err:
+            self._warn_once(source, f"is unreachable: {err}")
+            return {}
+        except Exception:  # noqa: BLE001 - one bad provider must not stop the rest
+            _LOGGER.exception("Unexpected error polling %s", source.name)
+            return {}
+        source.polled = True
+        if source.name in self._warned:
+            self._warned.discard(source.name)
+            _LOGGER.info("%s is reachable again", source.name)
+        return clients
+
+    def _warn_once(self, source: _Source, what: str) -> None:
+        if source.name not in self._warned:
+            self._warned.add(source.name)
+            _LOGGER.warning(
+                "%s %s — connection paths from it are unavailable", source.name, what
+            )
+
+    def _collect_stations(
+        self, results: list[dict[str, RouterClient]]
+    ) -> dict[str, _Station]:
+        """Union of the access points' wireless associations, keyed by MAC.
+
+        Only wireless claims are taken: an access point calling a device wired
+        says nothing useful, since the gateway already reports that. A device
+        that shows up on two access points (a stale association after roaming)
+        is attributed to the one hearing it strongest.
+        """
+        stations: dict[str, _Station] = {}
+        for source, clients in zip(self._access_points, results, strict=True):
+            if not source.polled:
+                continue
+            for mac, client in clients.items():
+                if not client.connection or client.connection not in WIFI_CONNECTIONS:
+                    continue
+                new = _Station(client.connection, client.signal, source.name)
+                current = stations.get(mac)
+                if current is None or _stronger(new.signal, current.signal):
+                    stations[mac] = new
+        return stations
 
     async def _async_update_external_ip(self) -> None:
         """Fetch the public IP and append to the change log when it moved."""
@@ -235,6 +362,8 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         self,
         scanned: list[ScannedDevice],
         router_clients: dict[str, RouterClient],
+        ap_stations: dict[str, _Station],
+        lan_trustworthy: bool,
     ) -> list[dict[str, Any]]:
         """Union of scan results and router clients, keyed by MAC (IP as fallback)."""
         merged: dict[str, dict[str, Any]] = {}
@@ -278,9 +407,40 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             if not entry["ip"] and client.ip:
                 entry["ip"] = client.ip
 
+        # Devices only an access point knows about — associated to it but not
+        # (yet) leased or answering the sweep.
+        for mac, station in ap_stations.items():
+            if mac not in merged:
+                merged[mac] = _new_device(
+                    ip=None,
+                    mac=mac,
+                    hostname=None,
+                    vendor=None,
+                    online=True,
+                    sources=[],
+                )
+
+        for mac, entry in merged.items():
+            station = ap_stations.get(mac)
+            if station is not None:
+                # An access point hearing a device outranks the gateway, which
+                # can only see it arriving over a wire.
+                entry["connection"] = station.band
+                entry["signal"] = station.signal
+                entry["access_point"] = station.ap_name
+                entry["online"] = True
+                if "access point" not in entry["sources"]:
+                    entry["sources"].append("access point")
+            elif entry["connection"] == CONNECTION_LAN and not lan_trustworthy:
+                entry["connection"] = CONNECTION_UNKNOWN
+            elif entry["connection"] in WIFI_CONNECTIONS:
+                entry["access_point"] = LABEL_MAIN_ROUTER
+
         return list(merged.values())
 
-    def _apply_memory(self, devices: list[dict[str, Any]]) -> None:
+    def _apply_memory(
+        self, devices: list[dict[str, Any]], paths_observed: bool = False
+    ) -> None:
         """Fold this cycle into the persistent memory, and the memory into it.
 
         Live devices update their memory record (first/last seen, last known
@@ -305,7 +465,9 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             if rec is None:
                 rec = {"first_seen": now_iso}
                 memory[key] = rec
-            for field in ("ip", "mac", "hostname", "vendor", "router_name"):
+            for field in (
+                "ip", "mac", "hostname", "vendor", "router_name", "access_point"
+            ):
                 if dev.get(field):
                     rec[field] = dev[field]
             if (
@@ -322,9 +484,13 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 dev["connection"] = rec["connection"]
             if dev["connection"] != CONNECTION_UNKNOWN:
                 rec["connection"] = dev["connection"]
-            elif rec.get("connection"):
-                # Scan-only cycle: keep showing the last path the router knew.
+            elif rec.get("connection") and not (paths_observed and dev["online"]):
+                # Keep showing the last known path — but only where nothing
+                # could observe one this cycle. A router that answered and did
+                # not place an online device must be allowed to say "unknown",
+                # otherwise a stale label outlives the truth.
                 dev["connection"] = rec["connection"]
+                dev["access_point"] = dev["access_point"] or rec.get("access_point")
             if dev["online"]:
                 rec["last_seen"] = now_iso
             dev["first_seen"] = rec["first_seen"]
@@ -342,6 +508,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 sources=["memory"],
             )
             dev["router_name"] = rec.get("router_name")
+            dev["access_point"] = rec.get("access_point")
             if rec.get("connection"):
                 dev["connection"] = rec["connection"]
             dev["first_seen"] = rec.get("first_seen")
@@ -497,10 +664,21 @@ def _new_device(
         "signal": None,
         "online": online,
         "router_name": None,
+        "access_point": None,
         "ha_device": None,
         "ha_area": None,
         "sources": sources,
     }
+
+
+def _stronger(new: int | None, current: int | None) -> bool:
+    """Whether `new` is a better signal. Units are per-brand; higher is better
+    in both conventions used (less-negative dBm, larger percentage)."""
+    if new is None:
+        return False
+    if current is None:
+        return True
+    return new > current
 
 
 def _as_ipv4(value: Any) -> str | None:

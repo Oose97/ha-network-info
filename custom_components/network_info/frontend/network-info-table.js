@@ -24,6 +24,7 @@ const COLUMNS = {
   ha_device: { label: "HA device" },
   ha_area: { label: "Area" },
   router_name: { label: "Router name" },
+  access_point: { label: "Access point" },
   first_seen: { label: "First seen", date: true },
   last_seen: { label: "Last seen", date: true },
   sources: { label: "Seen by" },
@@ -141,7 +142,8 @@ class NetworkInfoTable extends HTMLElement {
       list = list.filter((d) => {
         const hay = [
           d.name, d.ip, d.mac, d.hostname, d.vendor, d.connection,
-          d.router_name, d.ha_device, d.ha_area, (d.sources || []).join(" "),
+          d.router_name, d.access_point, d.ha_device, d.ha_area,
+          (d.sources || []).join(" "),
         ].join(" ").toLowerCase();
         return hay.includes(f);
       });
