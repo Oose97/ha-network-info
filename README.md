@@ -174,11 +174,21 @@ actions:
 mode: single
 ```
 
+## Roadmap
+
+- **Manually setting a device's connection path.** Where no router can be polled for
+  a device — an access point this integration cannot talk to, or one you would rather
+  not give credentials — the path reads Unknown. Being able to set it by hand, and
+  have that stick, would fill the gap that no amount of probing can.
+- **More router brands**, each one a module plus a catalog entry.
+- **Presence detection** — `device_tracker` entities so the device list can feed Home
+  Assistant's Person and presence machinery.
+- **Deeper enrichment** — mDNS, UPnP and NetBIOS names for devices that answer neither
+  reverse DNS nor a router's naming.
+
 ## Not part of the integration
 
 - **A dashboard.** The card is provided — where it goes is yours to decide.
-- **Presence detection.** The device list tells you what is on the network, but it does
-  not create `device_tracker` entities yet — that is on the roadmap, not in the box.
 - **Path info without router access.** Which band a device uses simply does not exist
   outside the access point; without a supported router and its password the path column
   reads Unknown, and that is honest rather than guessed.
