@@ -24,13 +24,15 @@
         "description": "Connection details for your {brand} router. The address is pre-filled with the brand's usual gateway — adjust it if yours differs.",
         "data": {
           "router_host": "Router address",
-          "router_username": "Router username",
-          "router_password": "Router admin password"
+          "router_username": "Username",
+          "router_password": "Admin password",
+          "router_https": "Connect over HTTPS"
         },
         "data_description": {
           "router_host": "IP address of the router on your network.",
-          "router_username": "The username the router's web UI expects.",
-          "router_password": "The router's admin (web UI) password."
+          "router_username": "Usually left at the default; some firmware revisions expect a different one.",
+          "router_password": "The router's admin (web UI) password.",
+          "router_https": "Pre-set to what this brand normally uses. Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP. Self-signed certificates are accepted."
         }
       }
     },
@@ -72,13 +74,15 @@
         "description": "Connection details for your {brand} router.",
         "data": {
           "router_host": "Router address",
-          "router_username": "Router username",
-          "router_password": "Router admin password"
+          "router_username": "Username",
+          "router_password": "Admin password",
+          "router_https": "Connect over HTTPS"
         },
         "data_description": {
           "router_host": "IP address of the router on your network.",
-          "router_username": "The username the router's web UI expects.",
-          "router_password": "The router's admin (web UI) password."
+          "router_username": "Usually left at the default; some firmware revisions expect a different one.",
+          "router_password": "The router's admin (web UI) password.",
+          "router_https": "Pre-set to what this brand normally uses. Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP. Self-signed certificates are accepted."
         }
       }
     },
@@ -130,12 +134,24 @@
           "data": {
             "router_host": "Access point address",
             "router_username": "Username",
-            "router_password": "Admin password"
+            "router_password": "Admin password",
+            "router_https": "Connect over HTTPS"
           },
           "data_description": {
             "router_host": "IP address of the access point on your network.",
-            "router_username": "The username its web interface expects.",
-            "router_password": "Its admin (web UI) password."
+            "router_username": "Usually left at the default; some firmware revisions expect a different one.",
+            "router_password": "Its admin (web UI) password.",
+            "router_https": "Pre-set to what this brand normally uses. Turn it on if the access point's local management is HTTPS-only."
+          }
+        },
+        "address": {
+          "title": "Access point address",
+          "description": "Optional, and only used to label the access point itself in the device table — it is not contacted.",
+          "data": {
+            "router_host": "Address"
+          },
+          "data_description": {
+            "router_host": "IP address of this access point, if you know it. Leave empty to skip."
           }
         }
       },

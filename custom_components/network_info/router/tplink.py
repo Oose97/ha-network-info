@@ -3,15 +3,21 @@
 Covers the consumer Archer line (C6, C7, A7 and relatives). These log in with
 a password only — there is no username field in their web UI — but *how* the
 password is sent changed across firmware generations, and a given model can
-ship any of them. All three are attempted in turn, cheapest first:
+ship any of them:
 
 1. plain  — base64 of the password
 2. rsa    — the password RSA-encrypted with a key the router hands out
 3. signed — AES-encrypted payload plus an RSA signature (newest)
 
-Whichever succeeds is remembered for subsequent logins. The client list then
-comes from `admin/status?form=client_status`, whose entries carry a
-`wire_type` of `wired`, `2.4G` or `5G` — the band, stated outright.
+Which one applies is worked out *before* logging in, from the key material the
+login page hands out unauthenticated, so exactly one attempt is ever spent:
+these routers lock the account after a handful of failures, and probing by
+trial would burn that budget. The request wrapper differs too — older builds
+take form fields, newer ones a JSON envelope — and a 403 identifies that
+mismatch without counting as a failed login.
+
+The client list comes from `admin/status?form=client_status`, whose entries
+carry a `wire_type` of `wired`, `2.4G` or `5G` — the band, stated outright.
 
 The signed variant needs AES, taken from `cryptography`, which Home Assistant
 itself depends on; if it were unavailable that one variant is skipped rather
@@ -82,14 +88,17 @@ class TPLinkProvider(RouterProvider):
         self._variant: str | None = None
 
     # ── transport ────────────────────────────────────────────────────────
-    async def _post(self, path: str, data: dict[str, str]) -> dict[str, Any]:
+    async def _post(
+        self, path: str, data: dict[str, Any], as_json: bool = False
+    ) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {"json": data} if as_json else {"data": data}
         try:
             resp = await self._session.post(
                 f"{self._base}{path}",
-                data=data,
                 headers={"Referer": f"{self._base}/"},
                 timeout=_TIMEOUT,
                 ssl=False,
+                **kwargs,
             )
             resp.raise_for_status()
             text = await resp.text()
@@ -103,97 +112,106 @@ class TPLinkProvider(RouterProvider):
             ) from err
         return payload if isinstance(payload, dict) else {}
 
+    async def _post_either_envelope(
+        self, path: str, fields: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Post the fields form-encoded, falling back to the JSON envelope.
+
+        Firmware generations differ in the wrapper as well as the payload:
+        older builds take `operation=login&…` form fields, newer ones want
+        `{"method": "do", "login": {…}}`. A 403 means the wrapper was not
+        understood, which is not a failed login and does not count against the
+        router's attempt limit — so retrying the other shape is safe. Anything
+        that comes back as JSON is an answer, and is returned as-is.
+        """
+        form = {"operation": "login", **fields}
+        try:
+            return await self._post(path, form)
+        except RouterConnectionError as err:
+            if "403" not in str(err):
+                raise
+            _LOGGER.debug("Form-encoded request refused (403); trying JSON envelope")
+        return await self._post(path, {"method": "do", "login": fields}, as_json=True)
+
     # ── login ────────────────────────────────────────────────────────────
     async def async_login(self) -> None:
-        variants = [
-            ("plain", self._login_plain),
-            ("rsa", self._login_rsa),
-            ("signed", self._login_signed),
-        ]
-        if self._variant:  # a known-good variant goes first
-            variants.sort(key=lambda v: v[0] != self._variant)
+        """Work out which login this firmware wants, then attempt it once.
 
-        errors: list[str] = []
-        for name, attempt in variants:
-            try:
-                stok = await attempt()
-            except RouterConnectionError as err:
-                errors.append(f"{name}: {err}")
-                continue
-            except Exception as err:  # noqa: BLE001 - try the next variant
-                errors.append(f"{name}: {err}")
-                continue
-            if stok:
-                self._stok = stok
-                self._variant = name
-                _LOGGER.debug("Logged in to TP-Link router (%s variant)", name)
-                return
-            errors.append(f"{name}: rejected")
+        The router counts failed logins and locks the account out after a
+        handful, so trying every variant in turn would burn that budget for
+        nothing. The key material the router hands out is readable without
+        logging in and says which generation this is, so the choice is made
+        first and exactly one attempt follows.
+        """
+        variant, keys, auth = await self._async_detect_variant()
+        _LOGGER.debug("TP-Link login variant detected: %s", variant)
 
-        raise RouterAuthError(
-            "No supported login variant succeeded — " + "; ".join(errors)
-        )
+        payload = await self._attempt(variant, keys, auth)
+        stok = _stok_of(payload)
+        if stok:
+            self._stok = stok
+            self._variant = variant
+            _LOGGER.debug("Logged in to TP-Link router (%s variant)", variant)
+            return
 
-    async def _login_plain(self) -> str | None:
-        payload = await self._post(
-            "/cgi-bin/luci/;stok=/login?form=login",
-            {
-                "operation": "login",
-                "password": base64.b64encode(self._password.encode()).decode(),
-            },
-        )
-        return _stok_of(payload)
+        _LOGGER.debug("TP-Link login reply: %s", str(payload)[:200])
+        raise RouterAuthError(_login_error(payload, variant))
 
-    async def _login_rsa(self) -> str | None:
-        keys = await self._post(
-            "/cgi-bin/luci/;stok=/login?form=keys", {"operation": "read"}
-        )
-        key = _rsa_key(keys)
-        if key is None:
-            return None
-        encrypted = _rsa_encrypt(self._password.encode(), *key)
-        payload = await self._post(
-            "/cgi-bin/luci/;stok=/login?form=login",
-            {"operation": "login", "password": encrypted},
-        )
-        return _stok_of(payload)
+    async def _async_detect_variant(
+        self,
+    ) -> tuple[str, tuple[int, int] | None, dict[str, Any]]:
+        """Read the login page's key material — no attempt is spent doing so."""
+        keys_payload = await self._read_or_empty("keys")
+        auth_payload = await self._read_or_empty("auth")
+        password_key = _rsa_key(keys_payload)
+        sign_key = _rsa_key(auth_payload, field="key")
+        sequence = _to_int((auth_payload.get("data") or {}).get("seq"))
 
-    async def _login_signed(self) -> str | None:
+        if sign_key is not None and sequence is not None and _aes_encryptor():
+            return "signed", password_key, auth_payload
+        if password_key is not None:
+            return "rsa", password_key, auth_payload
+        return "plain", None, auth_payload
+
+    async def _read_or_empty(self, form: str) -> dict[str, Any]:
+        try:
+            return await self._post(
+                f"/cgi-bin/luci/;stok=/login?form={form}", {"operation": "read"}
+            )
+        except RouterConnectionError as err:
+            _LOGGER.debug("TP-Link ?form=%s unavailable: %s", form, err)
+            return {}
+
+    async def _attempt(
+        self, variant: str, key: tuple[int, int] | None, auth: dict[str, Any]
+    ) -> dict[str, Any]:
+        path = "/cgi-bin/luci/;stok=/login?form=login"
+        if variant == "plain":
+            return await self._post_either_envelope(
+                path, {"password": base64.b64encode(self._password.encode()).decode()}
+            )
+        if variant == "rsa":
+            assert key is not None
+            return await self._post_either_envelope(
+                path, {"password": _rsa_encrypt(self._password.encode(), *key)}
+            )
+
         aes = _aes_encryptor()
-        if aes is None:
-            _LOGGER.debug("cryptography unavailable — skipping the signed variant")
-            return None
-
-        keys = await self._post(
-            "/cgi-bin/luci/;stok=/login?form=keys", {"operation": "read"}
-        )
-        auth = await self._post(
-            "/cgi-bin/luci/;stok=/login?form=auth", {"operation": "read"}
-        )
-        password_key = _rsa_key(keys)
         sign_key = _rsa_key(auth, field="key")
         sequence = _to_int((auth.get("data") or {}).get("seq"))
-        if password_key is None or sign_key is None or sequence is None:
-            return None
+        assert aes is not None and sign_key is not None and sequence is not None
 
         # A fresh AES-128-CBC key/iv per login, as digit strings — the UI
         # generates them the same way, and the router expects that shape.
         aes_key = _digits(16)
         aes_iv = _digits(16)
         data = aes(aes_key, aes_iv, self._password.encode())
-
-        digest = hashlib.md5(
-            f"{self._username}{self._password}".encode()
-        ).hexdigest()
+        digest = hashlib.md5(f"{self._username}{self._password}".encode()).hexdigest()
         signature = _rsa_encrypt(
             f"k={aes_key}&i={aes_iv}&h={digest}&s={sequence + len(data)}".encode(),
             *sign_key,
         )
-        payload = await self._post(
-            "/cgi-bin/luci/;stok=/login?form=login",
-            {"operation": "login", "data": data, "sign": signature},
-        )
-        return _stok_of(payload)
+        return await self._post_either_envelope(path, {"data": data, "sign": signature})
 
     # ── clients ──────────────────────────────────────────────────────────
     async def async_get_clients(self) -> dict[str, RouterClient]:
@@ -260,10 +278,43 @@ def _parse_clients(data: Any) -> dict[str, RouterClient]:
 
 
 def _stok_of(payload: dict[str, Any]) -> str | None:
-    if not payload.get("success"):
-        return None
-    stok = (payload.get("data") or {}).get("stok")
-    return str(stok) if stok else None
+    """The session token, from either API shape."""
+    # Newer JSON API: {"error_code": 0, "stok": "..."}
+    if payload.get("stok") and not payload.get("error_code"):
+        return str(payload["stok"])
+    if payload.get("success"):
+        stok = (payload.get("data") or {}).get("stok")
+        if stok:
+            return str(stok)
+    return None
+
+
+def _login_error(payload: dict[str, Any], variant: str) -> str:
+    """Say what the router said, including how many attempts are left.
+
+    These routers lock the account after a fixed number of failures, so the
+    remaining budget is the most useful thing to pass on.
+    """
+    data = payload.get("data") or {}
+    remaining = _to_int(data.get("attemptsAllowed"))
+    failures = _to_int(data.get("failureCount"))
+    code = str(payload.get("errorcode") or payload.get("error_code") or "").lower()
+
+    if "exceed" in code or "attempt" in code or remaining == 0:
+        return (
+            "Router has locked out logins after too many failed attempts — "
+            "wait for it to clear, or reboot the router, before trying again"
+        )
+    if remaining is not None:
+        return (
+            f"Router rejected the password ({variant} login) — "
+            f"{remaining} attempt(s) left before it locks out"
+        )
+    if failures is not None:
+        return f"Router rejected the password ({variant} login)"
+    if code:
+        return f"Router refused the {variant} login: {code}"
+    return f"Router refused the {variant} login"
 
 
 def _rsa_key(payload: dict[str, Any], field: str = "password") -> tuple[int, int] | None:

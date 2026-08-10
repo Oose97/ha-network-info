@@ -33,10 +33,12 @@ const COLUMNS = {
 const DEFAULT_COLUMNS = ["name", "ip", "mac", "connection", "signal", "ha_area", "online"];
 
 // Render order of the connection groups when grouping is on.
-const GROUP_ORDER = ["Router", "LAN", "5 GHz", "2.4 GHz", "Guest", "Wi-Fi", "Unknown"];
+const GROUP_ORDER = ["Router", "Access point", "LAN", "5 GHz", "2.4 GHz", "Guest",
+  "Wi-Fi", "Unknown"];
 
 const BADGE_CLASS = {
   "Router": "b-router",
+  "Access point": "b-ap",
   "LAN": "b-lan",
   "5 GHz": "b-wifi5",
   "2.4 GHz": "b-wifi24",
@@ -194,13 +196,17 @@ class NetworkInfoTable extends HTMLElement {
             font-weight: 500; padding: 6px 10px 6px 0; cursor: pointer; user-select: none;
             border-bottom: 1px solid var(--divider-color, #444); }
           .nit td { padding: 5px 10px 5px 0; white-space: nowrap;
-            border-bottom: 1px solid color-mix(in srgb, var(--divider-color, #444) 40%, transparent); }
+            border-bottom: 1px solid color-mix(in srgb, var(--divider-color, #444) 40%, transparent);
+            /* The Home Assistant shell disables selection app-wide; cell text
+               has to ask for it back, or MAC and IP cannot be copied. */
+            -webkit-user-select: text; user-select: text; cursor: text; }
           .nit tr.off td { opacity: 0.45; }
           .nit tr.grp td { padding: 8px 0 4px; font-weight: 600; border-bottom: none;
             color: var(--primary-text-color); }
           .nit .mono { font-family: ui-monospace, monospace; font-size: 0.95em; }
           .nit .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.88em; }
           .b-router { background: rgba(121, 134, 203, 0.22); color: #9fa8da; }
+          .b-ap     { background: rgba(0, 172, 193, 0.20);  color: #4dd0e1; }
           .b-lan    { background: rgba(33, 150, 243, 0.18); color: #64b5f6; }
           .b-wifi5  { background: rgba(76, 175, 80, 0.18);  color: #81c784; }
           .b-wifi24 { background: rgba(255, 152, 0, 0.20);  color: #ffb74d; }

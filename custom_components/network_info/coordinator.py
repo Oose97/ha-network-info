@@ -34,6 +34,7 @@ from .const import (
     CONF_ROUTER_USE_HTTPS,
     CONF_ROUTER_USERNAME,
     CONF_SCAN_INTERVAL,
+    CONNECTION_ACCESS_POINT,
     CONNECTION_ROUTER,
     CONNECTION_SLUGS,
     CONNECTION_UNKNOWN,
@@ -87,6 +88,7 @@ class _Source:
     brand: str
     role: str
     provider: RouterProvider | None  # None = declared but not polled
+    ip: str | None = None  # its own address on the network, when known
     polled: bool = False
 
     @property
@@ -132,7 +134,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             brand = "xiaomi_miwifi" if router_host and router_password else ROUTER_BRAND_NONE
         # The device at this address IS the router — known from config even
         # without API access, so it can be labeled regardless.
-        self._router_ip = router_host.split("://")[-1].split("/")[0].split(":")[0]
+        self._router_ip = _host_ip(router_host)
 
         gateway_provider: RouterProvider | None = None
         if brand != ROUTER_BRAND_NONE and router_host:
@@ -179,6 +181,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                     brand=ap_brand,
                     role=ROLE_ACCESS_POINT,
                     provider=provider,
+                    ip=_host_ip(ap_host),
                 )
             )
         self._warned: set[str] = set()
@@ -229,11 +232,18 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         # of them claims the device.
         lan_trustworthy = all(ap.polled for ap in self._access_points)
         devices = self._merge(scanned, router_clients, ap_stations, lan_trustworthy)
+        # The network's own infrastructure: these devices are what everything
+        # else connects *through*, so a path of their own says more than
+        # whichever port they happen to sit on.
+        infrastructure = {
+            ap.ip: CONNECTION_ACCESS_POINT for ap in self._access_points if ap.ip
+        }
         if self._router_ip:
-            for device in devices:
-                if device["ip"] == self._router_ip:
-                    device["connection"] = CONNECTION_ROUTER
-                    break
+            infrastructure[self._router_ip] = CONNECTION_ROUTER
+        for device in devices:
+            label = infrastructure.get(device["ip"])
+            if label:
+                device["connection"] = label
         # A remembered path may only stand in when nothing could observe one
         # this cycle; otherwise an old value would outlive the truth.
         paths_observed = self._gateway.polled or any(
@@ -669,6 +679,11 @@ def _new_device(
         "ha_area": None,
         "sources": sources,
     }
+
+
+def _host_ip(host: str) -> str:
+    """The bare address out of a configured host (scheme and port stripped)."""
+    return host.split("://")[-1].split("/")[0].split(":")[0]
 
 
 def _stronger(new: int | None, current: int | None) -> bool:
