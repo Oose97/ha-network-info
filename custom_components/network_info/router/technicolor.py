@@ -123,12 +123,38 @@ class TechnicolorProvider(RouterProvider):
         self._session = session
         self.model: str | None = None
         self._authenticated = False
+        # Cookies are tracked by hand: aiohttp's shared cookie jar runs with
+        # unsafe=False and so silently drops cookies set by a bare-IP host
+        # (RFC 6265), which is exactly what the gateway is. Without the session
+        # cookie the second /authenticate POST is answered 403, so the
+        # Set-Cookie from each response is captured and replayed as a Cookie
+        # header instead of relying on the jar.
+        self._cookies: dict[str, str] = {}
+
+    def _headers(self) -> dict[str, str]:
+        # Homeware gates its AJAX endpoints on the XHR header (and a same-origin
+        # Referer); the browser UI sends both, a bare request gets 403.
+        headers = {
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": f"{self._base}/",
+        }
+        if self._cookies:
+            headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in self._cookies.items())
+        return headers
+
+    def _store_cookies(self, resp: Any) -> None:
+        for key, morsel in resp.cookies.items():
+            self._cookies[key] = morsel.value
 
     async def _get(self, path: str) -> str:
         try:
             resp = await self._session.get(
-                f"{self._base}{path}", timeout=_TIMEOUT, ssl=False
+                f"{self._base}{path}",
+                timeout=_TIMEOUT,
+                ssl=False,
+                headers=self._headers(),
             )
+            self._store_cookies(resp)
             resp.raise_for_status()
             return await resp.text()
         except (ClientError, TimeoutError) as err:
@@ -137,8 +163,13 @@ class TechnicolorProvider(RouterProvider):
     async def _post(self, path: str, data: dict[str, str]) -> str:
         try:
             resp = await self._session.post(
-                f"{self._base}{path}", data=data, timeout=_TIMEOUT, ssl=False
+                f"{self._base}{path}",
+                data=data,
+                timeout=_TIMEOUT,
+                ssl=False,
+                headers=self._headers(),
             )
+            self._store_cookies(resp)
             resp.raise_for_status()
             return await resp.text()
         except (ClientError, TimeoutError) as err:
