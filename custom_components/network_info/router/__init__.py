@@ -90,10 +90,13 @@ def create_provider(
     use_https: bool,
 ) -> RouterProvider | None:
     """Instantiate the provider for a catalog brand id; None when unknown."""
-    from .xiaomi_miwifi import XiaomiMiWiFiProvider  # avoids an import cycle
+    # Imported here to avoid an import cycle (providers import from this module).
+    from .technicolor import TechnicolorProvider
+    from .xiaomi_miwifi import XiaomiMiWiFiProvider
 
     classes: dict[str, type] = {
         "xiaomi_miwifi": XiaomiMiWiFiProvider,
+        "technicolor": TechnicolorProvider,
     }
     cls = classes.get(brand)
     if cls is None:

@@ -26,9 +26,9 @@ Errors during a cycle degrade gracefully: the scan results still publish, the se
 `router_available` attribute turns `false`, and one warning is logged until the router
 recovers.
 
-## Xiaomi MiWiFi
+## Xiaomi / MiWiFi
 
-The shipped provider talks to the local Luci-style web API of Xiaomi/MiWiFi routers
+This provider talks to the local Luci-style web API of Xiaomi/MiWiFi routers
 (AX series and older):
 
 - `init_info` (unauthenticated) supplies the model and which password-hash scheme the
@@ -42,6 +42,27 @@ The shipped provider talks to the local Luci-style web API of Xiaomi/MiWiFi rout
 
 Only the router **admin password** is needed — the username is always `admin` on
 MiWiFi.
+
+## Technicolor (Homeware)
+
+Supports Technicolor gateways running Homeware firmware — the OpenWRT-based build with
+the `.lp` web UI, used by many ISP-supplied DGA/TG models.
+
+- Authentication is the gateway's **SRP-6** handshake (fixed multiplier, SHA-256 over
+  the RFC 5054 2048-bit group), implemented in `router/srp6.py` with no extra
+  dependency. It needs both a username (usually `admin`) and the admin password —
+  on ISP units the password is often the "Access key" printed on the device label.
+- Clients come from `modals/device-modal.lp`, falling back to
+  `modals/ipv6devices-modal.lp` when the first is empty. Hostname, IPv4 and MAC are
+  read reliably; the **connection path is parsed best-effort** from whatever the build
+  labels its interfaces, and stays Unknown when the modal does not expose it. Per-client
+  signal is not published by these modals, so it stays empty.
+- Because Homeware builds are heavily ISP-customized, modal layouts differ. The parser
+  handles the table layout (columns matched by header) and falls back to scanning for
+  MAC addresses with their surrounding context, so an unseen build still yields
+  devices even when the path cannot be determined.
+- Technicolor's DOCSIS cable gateways (CGA/CGM series) run a different UI and are not
+  covered.
 
 ## The brand catalog
 

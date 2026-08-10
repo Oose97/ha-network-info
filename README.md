@@ -16,7 +16,8 @@ device also gets its connection path, signal level and the router's name for it.
   via the scan ([details](docs/scanning.md)).
 - **Connection path per device** — LAN / 2.4 GHz / 5 GHz / guest, plus signal level,
   read from the router's own API. Router brands are pluggable providers behind one
-  interface; Xiaomi MiWiFi is implemented ([details](docs/routers.md)).
+  interface; Xiaomi/MiWiFi and Technicolor (Homeware) are implemented
+  ([details](docs/routers.md)).
 - **The integration owns the memory**: every device ever seen is stored with first- and
   last-seen timestamps and stays listed when it goes offline — surviving restarts and
   working identically in scan-only mode. The router only enriches the list
@@ -47,8 +48,8 @@ Then _Settings → Devices & Services → Add Integration → Network Info_. The
 and router address come pre-filled — see [Setup](docs/setup.md).
 
 Requires Home Assistant 2024.12+ and the `nmap` executable (bundled with Home Assistant
-OS and Container images). Connection-path info needs a supported router — currently
-Xiaomi/MiWiFi — and its admin password.
+OS and Container images). Connection-path info needs a supported router —
+Xiaomi/MiWiFi or Technicolor (Homeware) — and its admin credentials.
 
 ## Documentation
 
@@ -96,8 +97,8 @@ Go to [Router providers](docs/routers.md) for more details.
   the brand's default gateway, HTTPS default and which credentials it needs, so the
   router step comes pre-filled and only asks for what the brand requires.
 - Providers implement one interface (`async_get_clients`, keyed by MAC); the rest of
-  the integration is brand-agnostic. Xiaomi MiWiFi ships first; adding a brand is one
-  module plus one catalog entry.
+  the integration is brand-agnostic. Xiaomi/MiWiFi and Technicolor (Homeware) ship
+  today; adding a brand is one module plus one catalog entry.
 
 ### Cards
 
