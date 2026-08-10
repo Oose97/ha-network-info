@@ -192,6 +192,22 @@ def _ap_schema(
     )
 
 
+def _submitted_router(user_input: dict[str, Any]) -> dict[str, Any]:
+    """What the user actually submitted, with every field spelled out.
+
+    An optional field left empty is dropped from the submission entirely, so a
+    redisplayed form cannot tell "cleared" from "never filled in" — and would
+    helpfully reinstate the catalog default the user had just deleted. Naming
+    every field, empty ones included, removes that ambiguity.
+    """
+    return {
+        CONF_ROUTER_HOST: user_input.get(CONF_ROUTER_HOST, ""),
+        CONF_ROUTER_USERNAME: user_input.get(CONF_ROUTER_USERNAME, ""),
+        CONF_ROUTER_PASSWORD: user_input.get(CONF_ROUTER_PASSWORD, ""),
+        CONF_ROUTER_USE_HTTPS: bool(user_input.get(CONF_ROUTER_USE_HTTPS, False)),
+    }
+
+
 def _normalize_base(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
     errors: dict[str, str] = {}
     data = {
@@ -310,7 +326,7 @@ class NetworkInfoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data, errors = await _check_router(self.hass, self._base, spec, user_input)
             if not errors:
                 return self._create(data)
-            defaults = user_input
+            defaults = _submitted_router(user_input)
         else:
             defaults = {}
 
@@ -433,7 +449,7 @@ class AccessPointSubentryFlow(config_entries.ConfigSubentryFlow):
             if not errors:
                 self._data = data
                 return self._finish(reconfigure)
-            defaults = user_input
+            defaults = _submitted_router(user_input)
         else:
             current = self._entry_data() if reconfigure else {}
             defaults = (
@@ -505,7 +521,7 @@ class NetworkInfoOptionsFlow(config_entries.OptionsFlow):
             data, errors = await _check_router(self.hass, self._base, spec, user_input)
             if not errors:
                 return self.async_create_entry(data=data)
-            defaults = user_input
+            defaults = _submitted_router(user_input)
         else:
             current = self._current()
             # Keep the stored details only while the brand stays the same;

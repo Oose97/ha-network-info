@@ -323,17 +323,31 @@ def _from_table(rows: list[list[str]]) -> dict[str, RouterClient]:
                 return i
         return None
 
+    def find_all(*names: str) -> list[int]:
+        return [
+            i for i, cell in enumerate(header) if any(n in cell for n in names)
+        ]
+
     mac_i = find("mac")
     if mac_i is None:
         return {}
     name_i = find("hostname", "name", "device")
     ip_i = find("ipv4", "ip address", "ip")
-    path_i = find("interface", "connected via", "access point", "link", "radio", "band")
+    # The interface/band lives under a different header per firmware. Every
+    # plausible column is collected and their text classified together, so a
+    # build that splits it across e.g. "type" (Wi-Fi/Ethernet) and "port"
+    # (2.4GHz/LAN1) still resolves — seen on the TG789vac, whose device modal
+    # columns are status/hostname/ip/mac/type/port.
+    path_is = find_all(
+        "type", "port", "interface", "connected via", "access point",
+        "link", "radio", "band", "medium", "connection",
+    )
     state_i = find("state", "status", "active", "online")
     _LOGGER.debug(
         "Device modal headers %s (mac=%s ip=%s name=%s path=%s state=%s)",
-        header, mac_i, ip_i, name_i, path_i, state_i,
+        header, mac_i, ip_i, name_i, path_is, state_i,
     )
+    logged_sample = False
 
     clients: dict[str, RouterClient] = {}
     for row in rows[1:]:
@@ -344,11 +358,14 @@ def _from_table(rows: list[list[str]]) -> dict[str, RouterClient]:
             continue
         ip = _first_ip(row[ip_i]) if ip_i is not None and ip_i < len(row) else None
         name = row[name_i] if name_i is not None and name_i < len(row) else None
-        conn = (
-            _classify(row[path_i])
-            if path_i is not None and path_i < len(row)
-            else None
-        )
+        path_text = " ".join(row[i] for i in path_is if i < len(row))
+        conn = _classify(path_text) if path_text else None
+        if not logged_sample:
+            logged_sample = True
+            _LOGGER.debug(
+                "Device modal first row: cells=%s -> path_text=%r -> %s",
+                row, path_text, conn,
+            )
         # The modal lists every device the gateway has ever seen. An explicit
         # state column decides when present; otherwise the absence of a current
         # lease (no IP) is what distinguishes a remembered device from a

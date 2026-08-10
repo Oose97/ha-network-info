@@ -10,6 +10,11 @@ own frequency says which band that is. Wired clients are read from the DHCP
 lease list, which only the router of a network has — an access point usually
 has none, and reports its wireless stations only.
 
+Which rpcd modules a build ships varies, so stations are looked for in three
+places and whichever answers is used: `iwinfo`, LuCI's own `luci-rpc`, and
+finally each radio's `hostapd` — an access point cannot serve Wi-Fi without
+that last one. A missing object is expected, not an error.
+
 Requires ubus to be reachable over HTTP (`uhttpd-mod-ubus`, standard with
 LuCI). Vendor firmwares that strip it cannot be polled this way.
 """
@@ -18,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
@@ -35,6 +41,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _TIMEOUT = ClientTimeout(total=20)
 _NULL_SESSION = "00000000000000000000000000000000"
+_MAC_RE = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}", re.IGNORECASE)
 
 
 class OpenWrtProvider(RouterProvider):
@@ -120,39 +127,43 @@ class OpenWrtProvider(RouterProvider):
             clients = await self._async_collect()
         return clients
 
+    async def _safe_rpc(
+        self, obj: str, method: str, params: dict[str, Any] | None = None
+    ) -> Any:
+        """An optional call: a missing object is not a failure of the whole poll.
+
+        Vendor builds ship different subsets of the rpcd modules — Cudy has no
+        `iwinfo`, for one — so every source is tried and whatever answers is
+        used.
+        """
+        assert self._session_id is not None
+        try:
+            return await self._rpc(self._session_id, obj, method, params)
+        except RouterAuthError:
+            raise
+        except RouterConnectionError as err:
+            _LOGGER.debug("ubus %s.%s unavailable: %s", obj, method, err)
+            return None
+
     async def _async_collect(self) -> dict[str, RouterClient]:
         assert self._session_id is not None
         clients: dict[str, RouterClient] = {}
 
-        devices = await self._rpc(self._session_id, "iwinfo", "devices")
-        radios = (devices or {}).get("devices") or []
-        if not radios:
-            _LOGGER.debug("ubus reported no wireless devices")
-
-        for radio in radios:
-            info = await self._rpc(
-                self._session_id, "iwinfo", "info", {"device": radio}
-            )
-            band = _band_of(info or {})
-            assoc = await self._rpc(
-                self._session_id, "iwinfo", "assoclist", {"device": radio}
-            )
-            for station in (assoc or {}).get("results") or []:
-                mac = normalize_mac(station.get("mac"))
-                if not mac:
-                    continue
-                clients[mac] = RouterClient(
-                    mac=mac,
-                    ip=None,
-                    name=None,
-                    connection=band,
-                    signal=_to_int(station.get("signal")),
-                    online=True,
-                )
+        for source in (
+            self._async_stations_iwinfo,
+            self._async_stations_luci,
+            self._async_stations_hostapd,
+        ):
+            stations = await source()
+            if stations:
+                clients.update(stations)
+                break
+        if not clients:
+            _LOGGER.debug("No ubus source reported any wireless stations")
 
         # Leases give the wired clients their IP and hostname — present on a
         # router, absent on a plain access point, which is fine either way.
-        leases = await self._rpc(self._session_id, "dhcp", "ipv4leases")
+        leases = await self._safe_rpc("dhcp", "ipv4leases")
         for entry in _iter_leases(leases):
             mac = normalize_mac(entry.get("mac") or entry.get("macaddr"))
             if not mac:
@@ -173,6 +184,104 @@ class OpenWrtProvider(RouterProvider):
                     online=True,
                 )
         return clients
+
+
+    async def _async_stations_iwinfo(self) -> dict[str, RouterClient]:
+        """The canonical source, where rpcd-mod-iwinfo is installed."""
+        devices = await self._safe_rpc("iwinfo", "devices")
+        clients: dict[str, RouterClient] = {}
+        for radio in (devices or {}).get("devices") or []:
+            info = await self._safe_rpc("iwinfo", "info", {"device": radio})
+            band = _band_of(info or {})
+            assoc = await self._safe_rpc("iwinfo", "assoclist", {"device": radio})
+            for station in (assoc or {}).get("results") or []:
+                mac = normalize_mac(station.get("mac"))
+                if mac:
+                    clients[mac] = _station(mac, band, station.get("signal"))
+        return clients
+
+    async def _async_stations_luci(self) -> dict[str, RouterClient]:
+        """LuCI's own RPC object, present on builds without iwinfo."""
+        payload = await self._safe_rpc("luci-rpc", "getWirelessDevices")
+        clients: dict[str, RouterClient] = {}
+        for radio in (payload or {}).values():
+            if not isinstance(radio, dict):
+                continue
+            band = _band_of(_find_iwinfo(radio))
+            for mac, station in _find_assoclist(radio).items():
+                clients[mac] = _station(mac, band, station.get("signal"))
+        return clients
+
+    async def _async_stations_hostapd(self) -> dict[str, RouterClient]:
+        """Ask each radio's hostapd directly — the last resort, and the most
+        widely present, since an access point cannot serve Wi-Fi without it."""
+        status = await self._safe_rpc("network.wireless", "status")
+        clients: dict[str, RouterClient] = {}
+        for radio in (status or {}).values():
+            if not isinstance(radio, dict):
+                continue
+            band = _band_of(_find_iwinfo(radio))
+            for interface in radio.get("interfaces") or []:
+                ifname = (interface or {}).get("ifname")
+                if not ifname:
+                    continue
+                payload = await self._safe_rpc(f"hostapd.{ifname}", "get_clients")
+                for mac, station in ((payload or {}).get("clients") or {}).items():
+                    normalized = normalize_mac(mac)
+                    if normalized and isinstance(station, dict):
+                        clients[normalized] = _station(
+                            normalized, band, station.get("signal")
+                        )
+        return clients
+
+
+def _station(mac: str, band: str | None, signal: Any) -> RouterClient:
+    return RouterClient(
+        mac=mac,
+        ip=None,
+        name=None,
+        connection=band,
+        signal=_to_int(signal),
+        online=True,
+    )
+
+
+def _find_iwinfo(node: Any, depth: int = 0) -> dict[str, Any]:
+    """The nearest frequency/channel in a radio's tree, whatever nests it."""
+    if depth > 4 or not isinstance(node, dict):
+        return {}
+    if "frequency" in node or "channel" in node:
+        return node
+    for value in node.values():
+        if isinstance(value, dict):
+            found = _find_iwinfo(value, depth + 1)
+            if found:
+                return found
+        elif isinstance(value, list):
+            for item in value:
+                found = _find_iwinfo(item, depth + 1)
+                if found:
+                    return found
+    return {}
+
+
+def _find_assoclist(node: Any, depth: int = 0) -> dict[str, dict[str, Any]]:
+    """Any MAC-keyed mapping in the tree is an association list."""
+    out: dict[str, dict[str, Any]] = {}
+    if depth > 4 or not isinstance(node, (dict, list)):
+        return out
+    values = node.values() if isinstance(node, dict) else node
+    if isinstance(node, dict):
+        macs = {
+            normalize_mac(k): v
+            for k, v in node.items()
+            if isinstance(v, dict) and _MAC_RE.fullmatch(str(k).strip())
+        }
+        if macs:
+            return {m: v for m, v in macs.items() if m}
+    for value in values:
+        out.update(_find_assoclist(value, depth + 1))
+    return out
 
 
 def _band_of(info: dict[str, Any]) -> str | None:
