@@ -17,7 +17,8 @@ device also gets its connection path, signal level and the router's name for it.
 - **Connection path per device** — LAN / 2.4 GHz / 5 GHz / guest, plus signal level,
   read from the router's own API. Router brands are pluggable providers behind one
   interface; Xiaomi/MiWiFi, Technicolor (Homeware), OpenWrt/Cudy, ASUSWRT and
-  TP-Link Archer are implemented ([details](docs/routers.md)).
+  TP-Link Archer are implemented, each confirmed against real hardware
+  ([details](docs/routers.md#confirmed-to-work-with)).
 - **Downstream access points are first-class** — add each one to the same entry and its
   wireless clients are reported as wireless, on the access point serving them, instead
   of the wired connection the main router necessarily sees. An access point can also be

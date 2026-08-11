@@ -29,19 +29,21 @@ network connection:
 | Track external IP | Fetches the network's public IP from `api.ipify.org` each scan cycle and publishes it as a sensor. This is the integration's **only** internet call, and only when enabled. |
 | Log external IP changes | Keeps a persistent log of every external IP change. Requires **Track external IP** to be enabled. The log survives restarts and is capped at the newest 500 entries. |
 
-Choosing a brand opens the second step, pre-filled from the catalog. Only the fields
-that brand actually needs are shown:
+Choosing a brand opens the second step, which asks only for what varies per
+household:
 
 | Field | Meaning |
 |---|---|
 | Router address | Pre-filled with the brand's usual gateway address; adjust if yours differs. |
-| Router username | Pre-filled with what the brand normally expects, and required only for brands that need one — but always offered, since firmware revisions differ. |
 | Router admin password | Required for brands that need one. |
-| Connect over HTTPS | Pre-set to what the brand normally uses. Turn it on if the router's local management is HTTPS-only, off if it is plain HTTP; self-signed certificates are accepted. |
+| Override the username / HTTPS defaults | The brand's usual username and HTTP(S) transport are applied automatically and suit almost every device. Turn this on to review and change them in one more step. |
 
-Everything the catalog supplies is a starting point, not a rule — each field
-stays editable, because the same model can behave differently across firmware
-revisions.
+The overrides step shows the username and the HTTPS toggle pre-filled with the
+brand's defaults. Whatever you set there is kept — a cleared field stays
+cleared, and revisiting the form later shows the toggle pre-checked with your
+values whenever they differ from the brand's defaults. Turn HTTPS on if the
+router's local management is HTTPS-only, off if it is plain HTTP;
+self-signed certificates are accepted either way.
 
 The credentials are verified against the router before the entry is created:
 
@@ -68,7 +70,7 @@ without touching anything else.
 |---|---|
 | Name | How the access point appears in the device table, e.g. the room it covers. |
 | Brand | Pick a brand to poll it for connected devices. **None** declares that it exists without polling it. |
-| Address / username / password | Shown once a brand is picked, prefilled from the catalog, verified before the access point is saved. With brand **None** just an optional address is asked for — it is never contacted, only used to label the access point itself in the table. |
+| Address / password | Shown once a brand is picked, prefilled from the catalog, verified before the access point is saved. Username and HTTPS apply from the brand's defaults, with the same override toggle as the router step. With brand **None** just an optional address is asked for — it is never contacted, only used to label the access point itself in the table. |
 
 Two things change once an access point is added:
 
