@@ -33,13 +33,14 @@ const COLUMNS = {
 const DEFAULT_COLUMNS = ["name", "ip", "mac", "connection", "signal", "ha_area", "online"];
 
 // Render order of the connection groups when grouping is on.
-const GROUP_ORDER = ["Router", "Access point", "LAN", "5 GHz", "2.4 GHz", "Guest",
-  "Wi-Fi", "Unknown"];
+const GROUP_ORDER = ["Router", "Access point", "LAN", "6 GHz", "5 GHz", "2.4 GHz",
+  "Guest", "Wi-Fi", "Unknown"];
 
 const BADGE_CLASS = {
   "Router": "b-router",
   "Access point": "b-ap",
   "LAN": "b-lan",
+  "6 GHz": "b-wifi6",
   "5 GHz": "b-wifi5",
   "2.4 GHz": "b-wifi24",
   "Guest": "b-guest",
@@ -81,7 +82,8 @@ class NetworkInfoTable extends HTMLElement {
     const cols = Array.isArray(this._cfg.columns) && this._cfg.columns.length
       ? this._cfg.columns.filter((c) => COLUMNS[c])
       : DEFAULT_COLUMNS.slice();
-    return { cols, sort: { key: "ip", dir: 1 }, group: false, offline: true };
+    return { cols, sort: { key: "ip", dir: 1 }, group: false, offline: true,
+      marks: true };
   }
 
   _storeKey() { return `network-info-table:${this._cfg.entity}`; }
@@ -101,6 +103,7 @@ class NetworkInfoTable extends HTMLElement {
         }
         if (typeof saved.group === "boolean") this._settings.group = saved.group;
         if (typeof saved.offline === "boolean") this._settings.offline = saved.offline;
+        if (typeof saved.marks === "boolean") this._settings.marks = saved.marks;
       }
     } catch (e) { /* corrupted storage — defaults stand */ }
   }
@@ -113,8 +116,11 @@ class NetworkInfoTable extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (!this._built) { this._render(); this._paint(); return; }
-    const attrs = this._attrs();
-    const sig = attrs ? `${attrs.last_scan}|${attrs.router_available}|${(attrs.devices || []).length}` : "missing";
+    // last_updated moves on any state or attribute change of this entity —
+    // including a pushed path override, which changes neither last_scan nor
+    // the device count.
+    const st = hass && hass.states[this._cfg.entity];
+    const sig = st ? `${st.last_updated}|${(st.attributes.devices || []).length}` : "missing";
     if (sig !== this._sig) { this._sig = sig; this._paint(); }
   }
 
@@ -208,6 +214,7 @@ class NetworkInfoTable extends HTMLElement {
           .b-router { background: rgba(121, 134, 203, 0.22); color: #9fa8da; }
           .b-ap     { background: rgba(0, 172, 193, 0.20);  color: #4dd0e1; }
           .b-lan    { background: rgba(33, 150, 243, 0.18); color: #64b5f6; }
+          .b-wifi6  { background: rgba(205, 220, 57, 0.20); color: #dce775; }
           .b-wifi5  { background: rgba(76, 175, 80, 0.18);  color: #81c784; }
           .b-wifi24 { background: rgba(255, 152, 0, 0.20);  color: #ffb74d; }
           .b-guest  { background: rgba(156, 39, 176, 0.18); color: #ba68c8; }
@@ -216,6 +223,21 @@ class NetworkInfoTable extends HTMLElement {
           .nit .dot { font-size: 0.8em; }
           .nit .on  { color: #66bb6a; }
           .nit .offd{ color: var(--secondary-text-color); }
+          /* Per-cell actions, revealed on hover. Visibility (not display)
+             keeps the layout stable, and hides them from clicks when away. */
+          .nit .cellacts { display: inline-flex; gap: 2px; margin-left: 6px;
+            vertical-align: middle; opacity: 0; visibility: hidden; transition: opacity .12s; }
+          .nit td:hover .cellacts { opacity: 1; visibility: visible; }
+          .nit .act { border: none; background: none; cursor: pointer; padding: 0 2px;
+            color: var(--secondary-text-color); font-size: 0.95em; line-height: 1;
+            -webkit-user-select: none; user-select: none; }
+          .nit .act:hover { color: var(--primary-text-color); }
+          .nit .badge[data-path] { cursor: pointer; }
+          .nit .ovr { margin-left: 4px; font-size: 0.8em; color: var(--secondary-text-color);
+            cursor: help; -webkit-user-select: none; user-select: none; }
+          .nit-path-opt { display: flex; align-items: center; gap: 8px; padding: 5px 0;
+            cursor: pointer; }
+          .nit-path-opt input { cursor: pointer; }
           .nit-foot { padding: 8px 0 4px; color: var(--secondary-text-color); font-size: 0.85em; }
           .nit-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 8;
             display: none; align-items: center; justify-content: center; }
@@ -287,8 +309,50 @@ class NetworkInfoTable extends HTMLElement {
       this._store();
       this._paint();
     });
+    // The body repaints wholesale, so row actions are delegated here once.
+    this._els.tbody.addEventListener("click", (ev) => {
+      const act = ev.target.closest("[data-copy],[data-open],[data-path],[data-rename]");
+      if (!act) return;
+      if (act.dataset.copy) { this._copy(act.dataset.copy, act); return; }
+      if (act.dataset.open) {
+        window.open("http://" + act.dataset.open, "_blank", "noopener");
+        return;
+      }
+      if (act.dataset.rename) {
+        this._openNameSheet(
+          act.dataset.rename, act.dataset.current, act.dataset.custom === "1"
+        );
+        return;
+      }
+      this._openPathSheet(
+        act.dataset.path, act.dataset.name, act.textContent.trim(),
+        act.dataset.ovr === "1"
+      );
+    });
 
     this._built = true;
+  }
+
+  _copy(text, btn) {
+    const ok = () => {
+      const prev = btn.textContent;
+      btn.textContent = "✓";
+      setTimeout(() => { btn.textContent = prev; }, 900);
+    };
+    const fallback = () => {
+      // Plain-HTTP Home Assistant has no navigator.clipboard.
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed;opacity:0";
+      this.appendChild(ta);
+      ta.select();
+      try { if (document.execCommand("copy")) ok(); }
+      catch (e) { /* no clipboard access at all */ }
+      ta.remove();
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(ok, fallback);
+    } else fallback();
   }
 
   // ── table ────────────────────────────────────────────────
@@ -355,14 +419,41 @@ class NetworkInfoTable extends HTMLElement {
   _row(d, cols) {
     const cells = cols.map((c) => {
       switch (c) {
-        case "name":
-          return `<td><strong>${esc(d.name)}</strong></td>`;
-        case "ip":
+        case "name": {
+          const key = d.mac || (d.ip ? `ip:${d.ip}` : "");
+          const mark = d.name_override && this._settings.marks
+            ? `<span class="ovr" title="Name set manually">✎</span>` : "";
+          const btn = key
+            ? `<span class="cellacts"><button class="act" data-rename="${esc(key)}"` +
+              ` data-current="${esc(d.name)}" data-custom="${d.name_override ? "1" : "0"}"` +
+              ` title="Rename">✎</button></span>`
+            : "";
+          return `<td><strong>${esc(d.name)}</strong>${mark}${btn}</td>`;
+        }
+        case "ip": {
+          if (!d.ip) return "<td></td>";
+          const ip = esc(d.ip);
+          // The address stays plain selectable text; the actions sit beside
+          // it and only show on hover.
+          return `<td class="mono">${ip}<span class="cellacts">` +
+            `<button class="act" data-copy="${ip}" title="Copy IP">⧉</button>` +
+            `<button class="act" data-open="${ip}" title="Open in a new tab">↗</button>` +
+            `</span></td>`;
+        }
         case "mac":
           return `<td class="mono">${esc(d[c])}</td>`;
         case "connection": {
           const conn = d.connection || "Unknown";
-          return `<td><span class="badge ${BADGE_CLASS[conn] || "b-unknown"}">${esc(conn)}</span></td>`;
+          const key = d.mac || (d.ip ? `ip:${d.ip}` : "");
+          const badge = key
+            ? `<span class="badge ${BADGE_CLASS[conn] || "b-unknown"}" data-path="${esc(key)}"` +
+              ` data-name="${esc(d.name)}" data-ovr="${d.path_override ? "1" : "0"}"` +
+              ` title="Click to set the path manually">${esc(conn)}</span>`
+            : `<span class="badge ${BADGE_CLASS[conn] || "b-unknown"}">${esc(conn)}</span>`;
+          const mark = d.path_override && this._settings.marks
+            ? `<span class="ovr" title="Path set manually">✎</span>`
+            : "";
+          return `<td>${badge}${mark}</td>`;
         }
         case "online":
           return d.online
@@ -381,6 +472,74 @@ class NetworkInfoTable extends HTMLElement {
       }
     });
     return `<tr${d.online ? "" : ' class="off"'}>${cells.join("")}</tr>`;
+  }
+
+  // ── path sheet ───────────────────────────────────────────
+  _openPathSheet(key, name, current, overridden) {
+    const paths = ["LAN", "2.4 GHz", "5 GHz", "6 GHz", "Guest", "Wi-Fi", "Access point", "Router"];
+    const opt = (value, labelHtml, checked, note) => `
+      <label class="nit-path-opt">
+        <input type="radio" name="nit-path" value="${esc(value)}" ${checked ? "checked" : ""}>
+        ${labelHtml}${note ? `<span class="nit-note" style="margin:0">${esc(note)}</span>` : ""}
+      </label>`;
+    this._els.sheet.innerHTML = `
+      <h3>Path for ${esc(name || key)}</h3>
+      <div class="sect">Set by hand where nothing can observe it — the choice
+        sticks until set back to automatic.</div>
+      ${opt("auto", "Automatic", !overridden, overridden ? "" : `currently ${current}`)}
+      ${paths.map((p) =>
+        opt(p, `<span class="badge ${BADGE_CLASS[p]}">${esc(p)}</span>`,
+          overridden && p === current)
+      ).join("")}
+      <div class="nit-actions"><span></span><button id="nit-close">Close</button></div>`;
+    this._els.sheet.querySelector("#nit-close")
+      .addEventListener("click", () => this._closeSettings());
+    this._els.sheet.querySelectorAll("input[name=nit-path]").forEach((radio) => {
+      radio.addEventListener("change", () => {
+        if (!this._hass) return;
+        this._hass.callService("network_info", "set_path", {
+          mac: key, path: radio.value,
+        });
+        this._closeSettings();
+      });
+    });
+    this._els.overlay.classList.add("open");
+  }
+
+  // ── name sheet ───────────────────────────────────────────
+  _openNameSheet(key, current, isCustom) {
+    this._els.sheet.innerHTML = `
+      <h3>Name for ${esc(current)}</h3>
+      <div class="sect">Stored in the integration's device memory. The
+        automatic name comes from Home Assistant, the router, DNS or the
+        vendor.</div>
+      <input id="nit-name" class="nit-filter" type="text"
+        style="width:100%;box-sizing:border-box;margin-top:6px"
+        value="${isCustom ? esc(current) : ""}"
+        placeholder="${isCustom ? "Custom name" : esc(current)}">
+      <div class="nit-actions">
+        <button id="nit-name-auto"${isCustom ? "" : " disabled"}>Use automatic name</button>
+        <button id="nit-name-save">Save</button>
+      </div>`;
+    const input = this._els.sheet.querySelector("#nit-name");
+    const save = (value) => {
+      if (!this._hass) return;
+      this._hass.callService("network_info", "set_name", { mac: key, name: value });
+      this._closeSettings();
+    };
+    this._els.sheet.querySelector("#nit-name-save").addEventListener("click", () => {
+      const value = input.value.trim();
+      if (value) save(value);
+    });
+    this._els.sheet.querySelector("#nit-name-auto")
+      .addEventListener("click", () => save(""));
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      const value = input.value.trim();
+      if (value) save(value);
+    });
+    this._els.overlay.classList.add("open");
+    input.focus();
   }
 
   // ── settings sheet ───────────────────────────────────────
@@ -416,6 +575,10 @@ class NetworkInfoTable extends HTMLElement {
         <input type="checkbox" id="nit-offline" ${this._settings.offline ? "checked" : ""}>
         <label for="nit-offline">Show offline devices</label>
       </div>
+      <div class="nit-toggle">
+        <input type="checkbox" id="nit-marks" ${this._settings.marks ? "checked" : ""}>
+        <label for="nit-marks">Mark manually edited values (✎)</label>
+      </div>
       <div class="sect">Columns</div>
       ${cols.map((c, i) => colRow(c, i, true)).join("")}
       ${hidden.map((c) => colRow(c, -1, false)).join("")}
@@ -440,6 +603,11 @@ class NetworkInfoTable extends HTMLElement {
     });
     sheet.querySelector("#nit-offline").addEventListener("change", (ev) => {
       this._settings.offline = ev.target.checked;
+      this._store();
+      this._paint();
+    });
+    sheet.querySelector("#nit-marks").addEventListener("change", (ev) => {
+      this._settings.marks = ev.target.checked;
       this._store();
       this._paint();
     });

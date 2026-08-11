@@ -19,12 +19,28 @@ A provider lives in `custom_components/network_info/router/` and implements
 - `async_login()` — authenticate; raises `RouterAuthError` (bad credentials) or
   `RouterConnectionError` (unreachable/unexpected response).
 - `async_get_clients()` — returns `{mac: RouterClient}` with, per client: IP, the
-  router's device name, connection path (`LAN` / `2.4 GHz` / `5 GHz` / `Guest`),
+  router's device name, connection path (`LAN` / `2.4 GHz` / `5 GHz` / `6 GHz` / `Guest`),
   signal, and whether it is currently online.
 
 Errors during a cycle degrade gracefully: the scan results still publish, the sensor's
 `router_available` attribute turns `false`, and one warning is logged until the router
 recovers.
+
+## Confirmed to work with
+
+Every provider has been exercised against real hardware:
+
+| Brand | Confirmed hardware |
+|---|---|
+| Xiaomi / MiWiFi | Mesh System AX3000 (RA82), as the main router |
+| Technicolor (Homeware) | TG789vac v2, as the main router |
+| OpenWrt / Cudy (ubus) | Cudy AP1300, as a downstream access point |
+| ASUS (ASUSWRT) | RT-AC65P, as a downstream access point |
+| TP-Link Archer | Archer C6 on firmware 1.3 and newer, as a downstream access point — firmware 1.1 is confirmed **not** to work (see the TP-Link section) |
+
+Other models of the same families are expected to work — each provider targets the
+API family, not one model — but the hardware above is what they were actually
+validated against. Reports for further models are welcome.
 
 ## Xiaomi / MiWiFi
 
@@ -43,27 +59,6 @@ This provider talks to the local Luci-style web API of Xiaomi/MiWiFi routers
 Only the router **admin password** is needed — the username is always `admin` on
 MiWiFi.
 
-## Technicolor (Homeware)
-
-Supports Technicolor gateways running Homeware firmware — the OpenWRT-based build with
-the `.lp` web UI, used by many ISP-supplied DGA/TG models.
-
-- Authentication is the gateway's **SRP-6** handshake (fixed multiplier, SHA-256 over
-  the RFC 5054 2048-bit group), implemented in `router/srp6.py` with no extra
-  dependency. It needs both a username (usually `admin`) and the admin password —
-  on ISP units the password is often the "Access key" printed on the device label.
-- Clients come from `modals/device-modal.lp`, falling back to
-  `modals/ipv6devices-modal.lp` when the first is empty. Hostname, IPv4 and MAC are
-  read reliably; the **connection path is parsed best-effort** from whatever the build
-  labels its interfaces, and stays Unknown when the modal does not expose it. Per-client
-  signal is not published by these modals, so it stays empty.
-- Because Homeware builds are heavily ISP-customized, modal layouts differ. The parser
-  handles the table layout (columns matched by header) and falls back to scanning for
-  MAC addresses with their surrounding context, so an unseen build still yields
-  devices even when the path cannot be determined.
-- Technicolor's DOCSIS cable gateways (CGA/CGM series) run a different UI and are not
-  covered.
-
 ## The brand catalog
 
 `router/routers.json` describes every brand the config flow offers. One entry per
@@ -74,30 +69,40 @@ brand:
 | `id` | Internal brand id; maps to the provider class. |
 | `name` | Label shown in the config flow dropdown. |
 | `default_gateway` | Pre-fills the router address field. |
-| `default_username` | Pre-fills the username field. |
-| `requires_username` | Whether a username is *required*. The field is always shown, since firmware revisions differ on this. |
-| `requires_password` | Whether the flow shows a password field. |
-| `default_https` | Whether to start on HTTPS (self-signed certs accepted). This only pre-sets the form's toggle, which the user can change; providers additionally fall back to HTTP when the router has no TLS listener, and upgrade to HTTPS when the router redirects. |
+| `default_username` | The username that applies unless overridden. |
+| `requires_username` | Whether the effective username must be non-empty for this brand. |
+| `requires_password` | Whether the flow requires a password. |
+| `default_https` | Whether to talk HTTPS unless overridden (self-signed certs accepted). Providers additionally fall back to HTTP when the router has no TLS listener, and upgrade to HTTPS when the router redirects. |
 | `api_endpoint` | The API base shape, for reference and for providers that build URLs from it. |
 
 The config flow reads the catalog for its dropdown (with **None (scanning only)** as
-the default choice) and pre-fills the router step from the selected entry; only the
-credential fields the brand requires are shown.
+the default choice). The router step then asks only for what varies per household —
+address and password — while the brand's username and HTTP(S) transport apply
+silently from the catalog. The **Override the username / HTTPS defaults** toggle
+opens one more step showing both for editing; an override is kept and shown on later
+visits, and a cleared field stays cleared.
 
 ## Technicolor (Homeware)
 
-For ISP-supplied Technicolor gateways running Homeware firmware (DGA/TG "ac"
-models). Authentication is the gateway's SRP-6 handshake, implemented without
-extra dependencies; the session cookie and the `X-Requested-With` / `Referer`
+For ISP-supplied Technicolor gateways running Homeware firmware — the
+OpenWRT-based build with the `.lp` web UI used by many DGA/TG "ac" models.
+Authentication is the gateway's **SRP-6** handshake (fixed multiplier, SHA-256
+over the RFC 5054 2048-bit group), implemented in `router/srp6.py` with no
+extra dependency. It needs a username (usually `admin`) and the admin
+password — on ISP units the password is often the "Access key" printed on the
+device label. The session cookie and the `X-Requested-With` / `Referer`
 headers its AJAX endpoints expect are handled explicitly.
 
 Two modals are read, mirroring the two-endpoint pattern:
 
 - `device-modal.lp` — every device the gateway knows, with hostname, IPv4 and
-  MAC. This list includes devices that are **not currently connected**, so a
-  row counts as online only when an explicit state column says so, or — when
-  the build has no such column — when the device holds a current lease. A row
-  with no IP is a remembered device, not a connected one.
+  MAC (`ipv6devices-modal.lp` is the fallback when it is empty). This list
+  includes devices that are **not currently connected**, so a row counts as
+  online only when an explicit state column says so, or — when the build has
+  no such column — when the device holds a current lease. A row with no IP is
+  a remembered device, not a connected one. Builds that state the connection
+  in this modal itself (type/port columns) get their band read directly from
+  it, which also covers builds whose wireless modal is unusable.
 - `wireless-modal.lp` — the currently associated stations per radio, which is
   where the band (2.4 GHz / 5 GHz / guest) and signal come from. Layouts vary
   a lot between builds, so each station's band is taken from the nearest
@@ -117,6 +122,12 @@ access points, expect their clients to read LAN. When no wireless list can be
 read at all, paths stay unknown rather than claiming everything is wired.
 
 Per-device signal is only available for stations the gateway itself serves.
+
+Because Homeware builds are heavily ISP-customized, modal layouts differ. The
+parser handles the table layout (columns matched by header) and falls back to
+scanning for MAC addresses with their surrounding context, so an unseen build
+still yields devices even when the path cannot be determined. Technicolor's
+DOCSIS cable gateways (CGA/CGM series) run a different UI and are not covered.
 
 ## OpenWrt / Cudy (ubus)
 
@@ -149,18 +160,32 @@ online — so nothing has to be inferred.
 
 For the consumer Archer line (C6, C7, A7 and relatives). These have no
 username field — a password alone logs you in — but the way that password is
-transmitted changed across firmware generations, and a given model may ship
-any of them. Three variants are attempted in turn, cheapest first: the
-base64 password, an RSA-encrypted password, and an AES payload with an RSA
-signature. Whichever the router accepts is remembered for later logins.
+transmitted changed across firmware generations: a base64 password (plain),
+an RSA-encrypted password (rsa), or an AES-encrypted payload with an RSA
+signature (signed, the newest). Which one a firmware wants is read from the
+key material the login page hands out unauthenticated, so the choice is made
+*before* logging in and exactly one login attempt is ever spent — these
+routers lock the account after a handful of failures, and probing by trial
+would burn that budget.
+
+The signed variant implements the full scheme the router's own web UI speaks:
+the password RSA-encrypted (PKCS#1 v1.5) inside an AES-128-CBC envelope, a
+chunked RSA signature carrying the session key and sequence, replies decrypted
+with the same session key, and the `sysauth` session cookie replayed on every
+authenticated request — the client list included, which travels in the same
+envelope.
 
 Clients come from `admin/status?form=client_status`, whose entries carry a
 `wire_type` of `wired`, `2.4G` or `5G` — the band, stated directly — with the
 wireless statistics page as a fallback.
 
-The signed variant needs AES, taken from `cryptography` (a Home Assistant
-dependency, so present in every install); if it were missing that one variant
-is skipped rather than the provider failing.
+Confirmed with the Archer C6 on **firmware 1.3 and newer**. Firmware **1.1 is
+confirmed not to work** — it refuses the login without an error code — so
+update the router's firmware before adding it.
+
+The AES half is taken from `cryptography` (a Home Assistant dependency, so
+present in every install); if it were missing the signed variant is skipped
+rather than the provider failing.
 
 ## Adding a brand
 

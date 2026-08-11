@@ -2,7 +2,7 @@
 
 A Home Assistant integration that discovers **every device on your network** — not just
 the ones Home Assistant knows — remembers everything it has ever seen, and shows which
-path each device uses: **LAN, 2.4 GHz or 5 GHz Wi-Fi**. Ships its own table card.
+path each device uses: **LAN or 2.4 / 5 / 6 GHz Wi-Fi**. Ships its own table card.
 
 Scanning works with zero credentials; give it your router's admin password and every
 device also gets its connection path, signal level and the router's name for it.
@@ -14,10 +14,11 @@ device also gets its connection path, signal level and the router's name for it.
 - **Finds everything**: an nmap sweep of your subnet unioned with the router's client
   list — devices that block ping are still found via the router, silent wired devices
   via the scan ([details](docs/scanning.md)).
-- **Connection path per device** — LAN / 2.4 GHz / 5 GHz / guest, plus signal level,
+- **Connection path per device** — LAN / 2.4 GHz / 5 GHz / 6 GHz / guest, plus signal level,
   read from the router's own API. Router brands are pluggable providers behind one
   interface; Xiaomi/MiWiFi, Technicolor (Homeware), OpenWrt/Cudy, ASUSWRT and
-  TP-Link Archer are implemented ([details](docs/routers.md)).
+  TP-Link Archer are implemented, each confirmed against real hardware
+  ([details](docs/routers.md#confirmed-to-work-with)).
 - **Downstream access points are first-class** — add each one to the same entry and its
   wireless clients are reported as wireless, on the access point serving them, instead
   of the wired connection the main router necessarily sees. An access point can also be
@@ -83,7 +84,9 @@ Go to [Entities & services](docs/entities.md) for more details.
   rescans from the UI or automations.
 - Opt-in external IP sensor and change-log sensor — the log's state is its row count,
   so "the count went up" is a clean IP-changed trigger.
-- A `forget_device` service to prune stale entries from the device memory.
+- A `set_path` service to pin a device's connection path by hand where nothing can
+  observe it, a `set_name` service to name a device yourself, and a `forget_device`
+  service to prune stale entries from the device memory.
 
 ### Scanning & memory
 
@@ -176,10 +179,6 @@ mode: single
 
 ## Roadmap
 
-- **Manually setting a device's connection path.** Where no router can be polled for
-  a device — an access point this integration cannot talk to, or one you would rather
-  not give credentials — the path reads Unknown. Being able to set it by hand, and
-  have that stick, would fill the gap that no amount of probing can.
 - **More router brands**, each one a module plus a catalog entry.
 - **Presence detection** — `device_tracker` entities so the device list can feed Home
   Assistant's Person and presence machinery.
@@ -191,7 +190,8 @@ mode: single
 - **A dashboard.** The card is provided — where it goes is yours to decide.
 - **Path info without router access.** Which band a device uses simply does not exist
   outside the access point; without a supported router and its password the path column
-  reads Unknown, and that is honest rather than guessed.
+  reads Unknown, and that is honest rather than guessed. Where *you* know better, pin
+  the path by hand — a deliberate statement rather than a guess.
 
 ## License
 

@@ -30,7 +30,8 @@ shorter `h=…&s=…` signature. Every authenticated exchange, the client list
 included, goes through that envelope.
 
 The client list comes from `admin/status?form=client_status`, whose entries
-carry a `wire_type` of `wired`, `2.4G` or `5G` — the band, stated outright.
+carry a `wire_type` of `wired`, `2.4G`, `5G` or `6G` — the band, stated
+outright.
 
 The AES half is taken from `cryptography`, which Home Assistant itself
 depends on; if it were unavailable the signed variant is skipped rather than
@@ -53,6 +54,7 @@ from ..const import (
     CONNECTION_LAN,
     CONNECTION_WIFI_24,
     CONNECTION_WIFI_5,
+    CONNECTION_WIFI_6,
 )
 from . import (
     RouterAuthError,
@@ -73,6 +75,8 @@ _WIRE_TYPES = {
     "5ghz": CONNECTION_WIFI_5,
     "5g1": CONNECTION_WIFI_5,
     "5g2": CONNECTION_WIFI_5,
+    "6g": CONNECTION_WIFI_6,
+    "6ghz": CONNECTION_WIFI_6,
 }
 
 

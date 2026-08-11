@@ -21,7 +21,7 @@ One entry per device — everything the integration knows, remembered or live:
 | `name` | `Living Room TV` | best of: HA name → router name → hostname → vendor |
 | `hostname` | `tv-livingroom.lan` | reverse DNS |
 | `vendor` | `TP-Link Systems Inc.` | MAC OUI |
-| `connection` | `Router`, `Access point`, `2.4 GHz`, `5 GHz`, `LAN`, `Guest`, `Wi-Fi`, `Unknown` | router API; `Router` and `Access point` mark the configured infrastructure addresses themselves (no credentials needed); last known value is kept in scan-only mode |
+| `connection` | `Router`, `Access point`, `2.4 GHz`, `5 GHz`, `6 GHz`, `LAN`, `Guest`, `Wi-Fi`, `Unknown` | router API; `Router` and `Access point` mark the configured infrastructure addresses themselves (no credentials needed); last known value is kept in scan-only mode |
 | `signal` | `58` | router, wireless clients only |
 | `online` | `true` | scan / router |
 | `router_name` | `MyPhone` | router |
@@ -36,7 +36,7 @@ One entry per device — everything the integration knows, remembered or live:
 
 | Attribute | Meaning |
 |---|---|
-| `counts` | `total`, `online`, `offline`, and online devices per path: `router`, `access_point`, `lan`, `wifi_2_4_ghz`, `wifi_5_ghz`, `guest`, `wifi_other`, `unknown`. |
+| `counts` | `total`, `online`, `offline`, and online devices per path: `router`, `access_point`, `lan`, `wifi_2_4_ghz`, `wifi_5_ghz`, `wifi_6_ghz`, `guest`, `wifi_other`, `unknown`. |
 | `router_available` | `true`/`false` while a router is configured; `null` when running scan-only. The card uses this to gate path grouping. |
 | `router_model` | Hardware id reported by the router, when available. |
 | `access_points` | One entry per configured access point: `name`, `brand`, `managed` (false when declared without credentials) and `available`. |
@@ -51,5 +51,7 @@ database.
 
 | Service | Fields | What it does |
 |---|---|---|
+| `network_info.set_path` | `mac` (required), `path` (required) | Pins the device's connection path by hand — for devices nothing can observe, such as clients of an access point that cannot be polled. The pin lives in the device's memory record, so it survives restarts, outranks whatever scanning and router polling say, and disappears with the device on `forget_device`. `path: auto` clears the pin. For a device without a known MAC, pass `ip:<address>` as `mac`. The device table card offers the same from its Path column. |
+| `network_info.set_name` | `mac` (required), `name` (optional) | Gives the device a name of your choosing, stored in the device memory. It outranks the automatic name chain (HA registry → router → DNS → vendor); an empty or omitted `name` clears it. For a device without a known MAC, pass `ip:<address>` as `mac`. The device table card offers the same from its Name column. |
 | `network_info.forget_device` | `mac` (required) | Removes the device from the persistent memory. A device that is still on the network reappears on the next scan with fresh history; use this to prune stale offline rows. |
 | `network_info.import_ip_log` | `path` (required) | Imports external IP history from a CSV file (one `date,ip` pair per line) into the change log. Rows merge by date and consecutive duplicate IPs collapse, so it is safe to run twice. The file must live inside the HA configuration directory; requires IP change logging to be enabled. Returns the resulting row count. |

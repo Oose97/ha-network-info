@@ -28,7 +28,12 @@ from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
-from ..const import CONNECTION_LAN, CONNECTION_WIFI_24, CONNECTION_WIFI_5
+from ..const import (
+    CONNECTION_LAN,
+    CONNECTION_WIFI_24,
+    CONNECTION_WIFI_5,
+    CONNECTION_WIFI_6,
+)
 from . import (
     RouterAuthError,
     RouterClient,
@@ -285,9 +290,16 @@ def _find_assoclist(node: Any, depth: int = 0) -> dict[str, dict[str, Any]]:
 
 
 def _band_of(info: dict[str, Any]) -> str | None:
-    """2.4 or 5 GHz from the radio's frequency, falling back to its channel."""
+    """2.4, 5 or 6 GHz from the radio's frequency, falling back to its channel.
+
+    The 6 GHz band starts at 5925 MHz; the 5 GHz band tops out at 5895. The
+    channel fallback cannot tell 6 GHz apart (its channel numbers reuse the
+    low range), so a radio reporting only a channel reads as before.
+    """
     frequency = _to_int(info.get("frequency"))
     if frequency:
+        if frequency >= 5925:
+            return CONNECTION_WIFI_6
         return CONNECTION_WIFI_5 if frequency >= 4000 else CONNECTION_WIFI_24
     channel = _to_int(info.get("channel"))
     if channel:
