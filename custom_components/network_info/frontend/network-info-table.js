@@ -437,7 +437,7 @@ class NetworkInfoTable extends HTMLElement {
           // it and only show on hover.
           return `<td class="mono">${ip}<span class="cellacts">` +
             `<button class="act" data-copy="${ip}" title="Copy IP">⧉</button>` +
-            `<button class="act" data-open="${ip}" title="Open http://${ip} in a new tab">↗</button>` +
+            `<button class="act" data-open="${ip}" title="Open in a new tab">↗</button>` +
             `</span></td>`;
         }
         case "mac":

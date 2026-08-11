@@ -72,8 +72,10 @@ path/signal columns empty:
 - Click a column header to sort; click again to flip direction. IPs sort numerically,
   signal and the seen-timestamps sort by value.
 - **Hovering the IP cell** reveals two actions beside the address: **⧉ copy** puts
-  the IP on the clipboard (with a ✓ blink as confirmation) and **↗ open** opens
-  `http://<ip>` in a new tab. The address itself stays plain selectable text.
+  the IP on the clipboard (with a ✓ blink as confirmation) and **↗ open** opens the
+  device's address in a new tab (plain HTTP — the near-universal default for LAN
+  device pages; HTTPS-only devices redirect by themselves). The address itself
+  stays plain selectable text.
 - **Hovering the Name cell** reveals a ✎ rename action — the custom name is stored
   in the integration's device memory and outranks the automatic one; "Use automatic
   name" returns to it. Custom-named rows show a small ✎ next to the name. The same
