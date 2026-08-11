@@ -10,6 +10,7 @@ STORAGE_VERSION = 1
 SERVICE_FORGET_DEVICE = "forget_device"
 SERVICE_IMPORT_IP_LOG = "import_ip_log"
 SERVICE_SET_PATH = "set_path"
+SERVICE_SET_NAME = "set_name"
 
 # The service value that clears a manual path override.
 PATH_AUTO = "auto"

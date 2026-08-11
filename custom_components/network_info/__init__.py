@@ -24,6 +24,7 @@ from .const import (
     PATH_AUTO,
     SERVICE_FORGET_DEVICE,
     SERVICE_IMPORT_IP_LOG,
+    SERVICE_SET_NAME,
     SERVICE_SET_PATH,
     STORAGE_VERSION,
     ip_log_storage_key,
@@ -41,6 +42,13 @@ SET_PATH_SCHEMA = vol.Schema(
     {
         vol.Required("mac"): cv.string,
         vol.Required("path"): vol.In((*OVERRIDABLE_CONNECTIONS, PATH_AUTO)),
+    }
+)
+# An empty or omitted name clears the custom name, so the field is optional.
+SET_NAME_SCHEMA = vol.Schema(
+    {
+        vol.Required("mac"): cv.string,
+        vol.Optional("name", default=""): cv.string,
     }
 )
 
@@ -96,6 +104,20 @@ def _async_register_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_SET_PATH, _handle_set_path, schema=SET_PATH_SCHEMA
     )
 
+    async def _handle_set_name(call: ServiceCall) -> None:
+        key = _device_key(str(call.data["mac"]))
+        name = str(call.data["name"]).strip()
+        found = False
+        for entry in hass.config_entries.async_loaded_entries(DOMAIN):
+            coordinator: NetworkInfoCoordinator = entry.runtime_data
+            found = await coordinator.async_set_name(key, name or None) or found
+        if not found:
+            raise ServiceValidationError(f"No remembered device with MAC {key}")
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_NAME, _handle_set_name, schema=SET_NAME_SCHEMA
+    )
+
     async def _handle_import_ip_log(call: ServiceCall) -> ServiceResponse:
         path = str(call.data["path"]).strip()
         coordinators = [
@@ -149,6 +171,7 @@ async def async_unload_entry(
             hass.services.async_remove(DOMAIN, SERVICE_FORGET_DEVICE)
             hass.services.async_remove(DOMAIN, SERVICE_IMPORT_IP_LOG)
             hass.services.async_remove(DOMAIN, SERVICE_SET_PATH)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_NAME)
     return unloaded
 
 

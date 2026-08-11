@@ -71,6 +71,10 @@ path/signal columns empty:
 - **Hovering the IP cell** reveals two actions beside the address: **⧉ copy** puts
   the IP on the clipboard (with a ✓ blink as confirmation) and **↗ open** opens
   `http://<ip>` in a new tab. The address itself stays plain selectable text.
+- **Hovering the Name cell** reveals a ✎ rename action — the custom name is stored
+  in the integration's device memory and outranks the automatic one; "Use automatic
+  name" returns to it. Custom-named rows show a small ✎ next to the name. The same
+  is available as the `network_info.set_name` service.
 - **Click a path badge to pin the path by hand** — a sheet offers Automatic plus
   every path. A pinned path outranks whatever scanning and router polling say
   (that is its point: it covers devices nothing can observe, like clients of an

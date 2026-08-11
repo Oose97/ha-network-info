@@ -512,6 +512,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             if rec.get("path_override"):
                 dev["connection"] = rec["path_override"]
                 dev["path_override"] = True
+            dev["name_override"] = rec.get("name_override")
 
         for key, rec in memory.items():
             if key in live_keys:
@@ -531,6 +532,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             if rec.get("path_override"):
                 dev["connection"] = rec["path_override"]
                 dev["path_override"] = True
+            dev["name_override"] = rec.get("name_override")
             dev["first_seen"] = rec.get("first_seen")
             dev["last_seen"] = rec.get("last_seen")
             devices.append(dev)
@@ -599,6 +601,40 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             )
         return True
 
+    async def async_set_name(self, key: str, name: str | None) -> bool:
+        """Give a device a name of the user's choosing, or clear it.
+
+        Stored in the device's memory record like the path pin. The custom
+        name outranks the whole automatic chain (HA registry, router, DNS,
+        vendor); clearing falls back to it.
+        """
+        if self._memory is None:
+            self._memory = await self._store.async_load() or {}
+        rec = self._memory.get(key)
+        if rec is None:
+            return False
+        if name:
+            rec["name_override"] = name
+        elif rec.pop("name_override", None) is None:
+            return True  # clearing a name that was never set: nothing to do
+        await self._store.async_save(self._memory)
+        if self.data is not None:
+            devices = [dict(d) for d in self.data.devices]
+            for dev in devices:
+                if (dev.get("mac") or f"ip:{dev.get('ip')}") != key:
+                    continue
+                dev["name_override"] = name or None
+                dev["name"] = (
+                    name
+                    or dev.get("ha_device")
+                    or dev.get("router_name")
+                    or dev.get("hostname")
+                    or dev.get("vendor")
+                    or "Unknown"
+                )
+            self.async_set_updated_data(replace(self.data, devices=devices))
+        return True
+
     async def async_forget_device(self, mac: str) -> bool:
         """Drop a device from memory. An online device reappears next scan."""
         if self._memory is None:
@@ -650,7 +686,8 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 )
                 entry["ha_area"] = area.name if area else None
             entry["name"] = (
-                entry.get("ha_device")
+                entry.get("name_override")
+                or entry.get("ha_device")
                 or entry.get("router_name")
                 or entry.get("hostname")
                 or entry.get("vendor")
@@ -721,6 +758,7 @@ def _new_device(
         "ha_area": None,
         "sources": sources,
         "path_override": False,
+        "name_override": None,
     }
 
 

@@ -51,6 +51,32 @@ set_path:
             - "Access point"
             - "Router"
 
+set_name:
+  name: Set device name
+  description: >-
+    Give a device a name of your choosing. It is stored in the integration's
+    device memory, survives restarts, and outranks the automatic name (Home
+    Assistant registry, router, DNS, vendor). An empty name clears it, falling
+    back to the automatic one. The device table card offers this from the
+    Name column, too.
+  fields:
+    mac:
+      name: MAC address
+      description: >-
+        MAC address of the device (or "ip:<address>" for a device whose MAC
+        is not known).
+      required: true
+      example: "aa:bb:cc:dd:ee:ff"
+      selector:
+        text:
+    name:
+      name: Name
+      description: The name to show. Leave empty to return to the automatic name.
+      required: false
+      example: "Living room TV"
+      selector:
+        text:
+
 forget_device:
   name: Forget device
   description: >-

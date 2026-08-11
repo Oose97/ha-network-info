@@ -66,11 +66,12 @@ for the table to be complete.
 
 Each device shows the best name available, first match wins:
 
-1. Home Assistant device name (registry match by MAC — user-given name preferred)
-2. The router's name for the device
-3. Reverse-DNS hostname
-4. MAC vendor
-5. "Unknown"
+1. A name you set yourself (`network_info.set_name`, or ✎ in the table card)
+2. Home Assistant device name (registry match by MAC — user-given name preferred)
+3. The router's name for the device
+4. Reverse-DNS hostname
+5. MAC vendor
+6. "Unknown"
 
 ## What a wired device looks like
 

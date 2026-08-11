@@ -309,11 +309,17 @@ class NetworkInfoTable extends HTMLElement {
     });
     // The body repaints wholesale, so row actions are delegated here once.
     this._els.tbody.addEventListener("click", (ev) => {
-      const act = ev.target.closest("[data-copy],[data-open],[data-path]");
+      const act = ev.target.closest("[data-copy],[data-open],[data-path],[data-rename]");
       if (!act) return;
       if (act.dataset.copy) { this._copy(act.dataset.copy, act); return; }
       if (act.dataset.open) {
         window.open("http://" + act.dataset.open, "_blank", "noopener");
+        return;
+      }
+      if (act.dataset.rename) {
+        this._openNameSheet(
+          act.dataset.rename, act.dataset.current, act.dataset.custom === "1"
+        );
         return;
       }
       this._openPathSheet(
@@ -411,8 +417,17 @@ class NetworkInfoTable extends HTMLElement {
   _row(d, cols) {
     const cells = cols.map((c) => {
       switch (c) {
-        case "name":
-          return `<td><strong>${esc(d.name)}</strong></td>`;
+        case "name": {
+          const key = d.mac || (d.ip ? `ip:${d.ip}` : "");
+          const mark = d.name_override
+            ? `<span class="ovr" title="Name set manually">✎</span>` : "";
+          const btn = key
+            ? `<span class="cellacts"><button class="act" data-rename="${esc(key)}"` +
+              ` data-current="${esc(d.name)}" data-custom="${d.name_override ? "1" : "0"}"` +
+              ` title="Rename">✎</button></span>`
+            : "";
+          return `<td><strong>${esc(d.name)}</strong>${mark}${btn}</td>`;
+        }
         case "ip": {
           if (!d.ip) return "<td></td>";
           const ip = esc(d.ip);
@@ -487,6 +502,42 @@ class NetworkInfoTable extends HTMLElement {
       });
     });
     this._els.overlay.classList.add("open");
+  }
+
+  // ── name sheet ───────────────────────────────────────────
+  _openNameSheet(key, current, isCustom) {
+    this._els.sheet.innerHTML = `
+      <h3>Name for ${esc(current)}</h3>
+      <div class="sect">Stored in the integration's device memory. The
+        automatic name comes from Home Assistant, the router, DNS or the
+        vendor.</div>
+      <input id="nit-name" class="nit-filter" type="text"
+        style="width:100%;box-sizing:border-box;margin-top:6px"
+        value="${isCustom ? esc(current) : ""}"
+        placeholder="${isCustom ? "Custom name" : esc(current)}">
+      <div class="nit-actions">
+        <button id="nit-name-auto"${isCustom ? "" : " disabled"}>Use automatic name</button>
+        <button id="nit-name-save">Save</button>
+      </div>`;
+    const input = this._els.sheet.querySelector("#nit-name");
+    const save = (value) => {
+      if (!this._hass) return;
+      this._hass.callService("network_info", "set_name", { mac: key, name: value });
+      this._closeSettings();
+    };
+    this._els.sheet.querySelector("#nit-name-save").addEventListener("click", () => {
+      const value = input.value.trim();
+      if (value) save(value);
+    });
+    this._els.sheet.querySelector("#nit-name-auto")
+      .addEventListener("click", () => save(""));
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      const value = input.value.trim();
+      if (value) save(value);
+    });
+    this._els.overlay.classList.add("open");
+    input.focus();
   }
 
   // ── settings sheet ───────────────────────────────────────

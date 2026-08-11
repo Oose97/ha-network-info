@@ -85,8 +85,8 @@ Go to [Entities & services](docs/entities.md) for more details.
 - Opt-in external IP sensor and change-log sensor — the log's state is its row count,
   so "the count went up" is a clean IP-changed trigger.
 - A `set_path` service to pin a device's connection path by hand where nothing can
-  observe it, and a `forget_device` service to prune stale entries from the device
-  memory.
+  observe it, a `set_name` service to name a device yourself, and a `forget_device`
+  service to prune stale entries from the device memory.
 
 ### Scanning & memory
 
