@@ -33,13 +33,14 @@ const COLUMNS = {
 const DEFAULT_COLUMNS = ["name", "ip", "mac", "connection", "signal", "ha_area", "online"];
 
 // Render order of the connection groups when grouping is on.
-const GROUP_ORDER = ["Router", "Access point", "LAN", "5 GHz", "2.4 GHz", "Guest",
-  "Wi-Fi", "Unknown"];
+const GROUP_ORDER = ["Router", "Access point", "LAN", "6 GHz", "5 GHz", "2.4 GHz",
+  "Guest", "Wi-Fi", "Unknown"];
 
 const BADGE_CLASS = {
   "Router": "b-router",
   "Access point": "b-ap",
   "LAN": "b-lan",
+  "6 GHz": "b-wifi6",
   "5 GHz": "b-wifi5",
   "2.4 GHz": "b-wifi24",
   "Guest": "b-guest",
@@ -211,6 +212,7 @@ class NetworkInfoTable extends HTMLElement {
           .b-router { background: rgba(121, 134, 203, 0.22); color: #9fa8da; }
           .b-ap     { background: rgba(0, 172, 193, 0.20);  color: #4dd0e1; }
           .b-lan    { background: rgba(33, 150, 243, 0.18); color: #64b5f6; }
+          .b-wifi6  { background: rgba(205, 220, 57, 0.20); color: #dce775; }
           .b-wifi5  { background: rgba(76, 175, 80, 0.18);  color: #81c784; }
           .b-wifi24 { background: rgba(255, 152, 0, 0.20);  color: #ffb74d; }
           .b-guest  { background: rgba(156, 39, 176, 0.18); color: #ba68c8; }
@@ -457,7 +459,7 @@ class NetworkInfoTable extends HTMLElement {
 
   // ── path sheet ───────────────────────────────────────────
   _openPathSheet(key, name, current, overridden) {
-    const paths = ["LAN", "2.4 GHz", "5 GHz", "Guest", "Wi-Fi", "Access point", "Router"];
+    const paths = ["LAN", "2.4 GHz", "5 GHz", "6 GHz", "Guest", "Wi-Fi", "Access point", "Router"];
     const opt = (value, labelHtml, checked, note) => `
       <label class="nit-path-opt">
         <input type="radio" name="nit-path" value="${esc(value)}" ${checked ? "checked" : ""}>

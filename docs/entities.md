@@ -21,7 +21,7 @@ One entry per device — everything the integration knows, remembered or live:
 | `name` | `Living Room TV` | best of: HA name → router name → hostname → vendor |
 | `hostname` | `tv-livingroom.lan` | reverse DNS |
 | `vendor` | `TP-Link Systems Inc.` | MAC OUI |
-| `connection` | `Router`, `Access point`, `2.4 GHz`, `5 GHz`, `LAN`, `Guest`, `Wi-Fi`, `Unknown` | router API; `Router` and `Access point` mark the configured infrastructure addresses themselves (no credentials needed); last known value is kept in scan-only mode |
+| `connection` | `Router`, `Access point`, `2.4 GHz`, `5 GHz`, `6 GHz`, `LAN`, `Guest`, `Wi-Fi`, `Unknown` | router API; `Router` and `Access point` mark the configured infrastructure addresses themselves (no credentials needed); last known value is kept in scan-only mode |
 | `signal` | `58` | router, wireless clients only |
 | `online` | `true` | scan / router |
 | `router_name` | `MyPhone` | router |
@@ -36,7 +36,7 @@ One entry per device — everything the integration knows, remembered or live:
 
 | Attribute | Meaning |
 |---|---|
-| `counts` | `total`, `online`, `offline`, and online devices per path: `router`, `access_point`, `lan`, `wifi_2_4_ghz`, `wifi_5_ghz`, `guest`, `wifi_other`, `unknown`. |
+| `counts` | `total`, `online`, `offline`, and online devices per path: `router`, `access_point`, `lan`, `wifi_2_4_ghz`, `wifi_5_ghz`, `wifi_6_ghz`, `guest`, `wifi_other`, `unknown`. |
 | `router_available` | `true`/`false` while a router is configured; `null` when running scan-only. The card uses this to gate path grouping. |
 | `router_model` | Hardware id reported by the router, when available. |
 | `access_points` | One entry per configured access point: `name`, `brand`, `managed` (false when declared without credentials) and `available`. |

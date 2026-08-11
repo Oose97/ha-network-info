@@ -24,6 +24,7 @@ from ..const import (
     CONNECTION_LAN,
     CONNECTION_WIFI_24,
     CONNECTION_WIFI_5,
+    CONNECTION_WIFI_6,
 )
 from . import (
     RouterAuthError,
@@ -41,12 +42,14 @@ _UA = "Mozilla/5.0 (compatible; HomeAssistant Network Info)"
 _TOKEN_RE = re.compile(r"asus_token\s*[=:]\s*['\"]?([A-Za-z0-9._~+/-]{8,})")
 _ERROR_RE = re.compile(r"error_status\s*[=:]\s*['\"]?(\d+)")
 
-# isWL: 0 wired, 1 the 2.4 GHz radio, 2 and 3 the 5 GHz radios.
+# isWL: 0 wired, 1 the 2.4 GHz radio, 2 and 3 the 5 GHz radios, 4 the
+# 6 GHz radio on Wi-Fi 6E/7 models.
 _BAND_BY_ISWL = {
     "0": CONNECTION_LAN,
     "1": CONNECTION_WIFI_24,
     "2": CONNECTION_WIFI_5,
     "3": CONNECTION_WIFI_5,
+    "4": CONNECTION_WIFI_6,
 }
 
 

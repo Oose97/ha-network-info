@@ -19,7 +19,7 @@ A provider lives in `custom_components/network_info/router/` and implements
 - `async_login()` — authenticate; raises `RouterAuthError` (bad credentials) or
   `RouterConnectionError` (unreachable/unexpected response).
 - `async_get_clients()` — returns `{mac: RouterClient}` with, per client: IP, the
-  router's device name, connection path (`LAN` / `2.4 GHz` / `5 GHz` / `Guest`),
+  router's device name, connection path (`LAN` / `2.4 GHz` / `5 GHz` / `6 GHz` / `Guest`),
   signal, and whether it is currently online.
 
 Errors during a cycle degrade gracefully: the scan results still publish, the sensor's

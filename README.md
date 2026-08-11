@@ -2,7 +2,7 @@
 
 A Home Assistant integration that discovers **every device on your network** — not just
 the ones Home Assistant knows — remembers everything it has ever seen, and shows which
-path each device uses: **LAN, 2.4 GHz or 5 GHz Wi-Fi**. Ships its own table card.
+path each device uses: **LAN or 2.4 / 5 / 6 GHz Wi-Fi**. Ships its own table card.
 
 Scanning works with zero credentials; give it your router's admin password and every
 device also gets its connection path, signal level and the router's name for it.
@@ -14,7 +14,7 @@ device also gets its connection path, signal level and the router's name for it.
 - **Finds everything**: an nmap sweep of your subnet unioned with the router's client
   list — devices that block ping are still found via the router, silent wired devices
   via the scan ([details](docs/scanning.md)).
-- **Connection path per device** — LAN / 2.4 GHz / 5 GHz / guest, plus signal level,
+- **Connection path per device** — LAN / 2.4 GHz / 5 GHz / 6 GHz / guest, plus signal level,
   read from the router's own API. Router brands are pluggable providers behind one
   interface; Xiaomi/MiWiFi, Technicolor (Homeware), OpenWrt/Cudy, ASUSWRT and
   TP-Link Archer are implemented, each confirmed against real hardware

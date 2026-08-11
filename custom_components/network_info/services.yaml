@@ -45,6 +45,7 @@ set_path:
             - "LAN"
             - "2.4 GHz"
             - "5 GHz"
+            - "6 GHz"
             - "Guest"
             - "Wi-Fi"
             - "Access point"

@@ -30,6 +30,7 @@ from ..const import (
     CONNECTION_WIFI,
     CONNECTION_WIFI_24,
     CONNECTION_WIFI_5,
+    CONNECTION_WIFI_6,
 )
 from . import (
     RouterAuthError,
@@ -52,7 +53,7 @@ _MAC_RE = re.compile(r"([0-9a-f]{2}(?::[0-9a-f]{2}){5})", re.IGNORECASE)
 _IPV4_RE = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
 # Radio markers as they appear in wireless-modal headings and interface names.
 _BAND_RE = re.compile(
-    r"\b(?:5\s?GHz|2[.,]4\s?GHz|guest|wl[0-9])\b", re.IGNORECASE
+    r"\b(?:6\s?GHz|5\s?GHz|2[.,]4\s?GHz|guest|wl[0-9])\b", re.IGNORECASE
 )
 # "-58 dBm", "58 dBm", "Signal: 75%".
 _SIGNAL_RE = re.compile(r"(-?\d{1,3})\s*(?:dBm|%)", re.IGNORECASE)
@@ -65,6 +66,8 @@ def _classify(text: str) -> str | None:
         return None
     if "guest" in t:
         return CONNECTION_GUEST
+    if "6g" in t or "6 g" in t:
+        return CONNECTION_WIFI_6
     if "5g" in t or "5 g" in t or "wl1" in t or "wl2" in t:
         return CONNECTION_WIFI_5
     if "2.4" in t or "2,4" in t or "2g" in t or "wl0" in t:
