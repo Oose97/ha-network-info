@@ -15,6 +15,41 @@ import_ip_log:
       selector:
         text:
 
+set_path:
+  name: Set connection path
+  description: >-
+    Pin a device's connection path by hand — for devices nothing can observe,
+    such as clients of an access point this integration cannot poll. The pin
+    survives restarts and outranks whatever scanning and router polling would
+    say, until it is cleared by setting the path back to "auto". The device
+    table card offers this from the Path column, too.
+  fields:
+    mac:
+      name: MAC address
+      description: >-
+        MAC address of the device (or "ip:<address>" for a device whose MAC
+        is not known).
+      required: true
+      example: "aa:bb:cc:dd:ee:ff"
+      selector:
+        text:
+    path:
+      name: Path
+      description: The path to pin, or "auto" to clear the pin.
+      required: true
+      example: "5 GHz"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "LAN"
+            - "2.4 GHz"
+            - "5 GHz"
+            - "Guest"
+            - "Wi-Fi"
+            - "Access point"
+            - "Router"
+
 forget_device:
   name: Forget device
   description: >-

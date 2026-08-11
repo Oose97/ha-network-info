@@ -83,8 +83,11 @@ answered. If one is declared without credentials, or could not be reached, the
 gateway's wired verdict cannot be distinguished from "wireless behind that
 access point", so those devices read **Unknown** instead. It is a deliberate
 trade: a genuinely wired device loses its label rather than a wireless one
-gaining a wrong one. Making every access point pollable — or setting a path by
-hand, which is on the roadmap — is what resolves it.
+gaining a wrong one. Making every access point pollable is what resolves it —
+or pinning the path by hand: click the device's path badge in the table card,
+or call `network_info.set_path`. A pinned path outranks every observation and
+sticks until set back to automatic (observations keep being recorded
+underneath, so clearing the pin falls straight back to the latest truth).
 
 ## Limitations
 

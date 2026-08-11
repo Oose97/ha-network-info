@@ -20,8 +20,11 @@ from .cards import async_register as async_register_cards
 from .cards import async_unregister as async_unregister_cards
 from .const import (
     DOMAIN,
+    OVERRIDABLE_CONNECTIONS,
+    PATH_AUTO,
     SERVICE_FORGET_DEVICE,
     SERVICE_IMPORT_IP_LOG,
+    SERVICE_SET_PATH,
     STORAGE_VERSION,
     ip_log_storage_key,
     storage_key,
@@ -34,6 +37,17 @@ NetworkInfoConfigEntry = ConfigEntry[NetworkInfoCoordinator]
 
 FORGET_DEVICE_SCHEMA = vol.Schema({vol.Required("mac"): cv.string})
 IMPORT_IP_LOG_SCHEMA = vol.Schema({vol.Required("path"): cv.string})
+SET_PATH_SCHEMA = vol.Schema(
+    {
+        vol.Required("mac"): cv.string,
+        vol.Required("path"): vol.In((*OVERRIDABLE_CONNECTIONS, PATH_AUTO)),
+    }
+)
+
+
+def _device_key(value: str) -> str:
+    """Normalize the service's device reference (MAC, or ip:<ip>)."""
+    return value.strip().lower().replace("-", ":")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: NetworkInfoConfigEntry) -> bool:
@@ -55,7 +69,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
         return
 
     async def _handle_forget(call: ServiceCall) -> None:
-        mac = str(call.data["mac"]).strip().lower().replace("-", ":")
+        mac = _device_key(str(call.data["mac"]))
         forgotten = False
         for entry in hass.config_entries.async_loaded_entries(DOMAIN):
             coordinator: NetworkInfoCoordinator = entry.runtime_data
@@ -65,6 +79,21 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN, SERVICE_FORGET_DEVICE, _handle_forget, schema=FORGET_DEVICE_SCHEMA
+    )
+
+    async def _handle_set_path(call: ServiceCall) -> None:
+        key = _device_key(str(call.data["mac"]))
+        path = call.data["path"]
+        connection = None if path == PATH_AUTO else path
+        found = False
+        for entry in hass.config_entries.async_loaded_entries(DOMAIN):
+            coordinator: NetworkInfoCoordinator = entry.runtime_data
+            found = await coordinator.async_set_path(key, connection) or found
+        if not found:
+            raise ServiceValidationError(f"No remembered device with MAC {key}")
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_PATH, _handle_set_path, schema=SET_PATH_SCHEMA
     )
 
     async def _handle_import_ip_log(call: ServiceCall) -> ServiceResponse:
@@ -119,6 +148,7 @@ async def async_unload_entry(
         if not remaining:
             hass.services.async_remove(DOMAIN, SERVICE_FORGET_DEVICE)
             hass.services.async_remove(DOMAIN, SERVICE_IMPORT_IP_LOG)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_PATH)
     return unloaded
 
 

@@ -84,7 +84,9 @@ Go to [Entities & services](docs/entities.md) for more details.
   rescans from the UI or automations.
 - Opt-in external IP sensor and change-log sensor — the log's state is its row count,
   so "the count went up" is a clean IP-changed trigger.
-- A `forget_device` service to prune stale entries from the device memory.
+- A `set_path` service to pin a device's connection path by hand where nothing can
+  observe it, and a `forget_device` service to prune stale entries from the device
+  memory.
 
 ### Scanning & memory
 
@@ -177,10 +179,6 @@ mode: single
 
 ## Roadmap
 
-- **Manually setting a device's connection path.** Where no router can be polled for
-  a device — an access point this integration cannot talk to, or one you would rather
-  not give credentials — the path reads Unknown. Being able to set it by hand, and
-  have that stick, would fill the gap that no amount of probing can.
 - **More router brands**, each one a module plus a catalog entry.
 - **Presence detection** — `device_tracker` entities so the device list can feed Home
   Assistant's Person and presence machinery.
@@ -192,7 +190,8 @@ mode: single
 - **A dashboard.** The card is provided — where it goes is yours to decide.
 - **Path info without router access.** Which band a device uses simply does not exist
   outside the access point; without a supported router and its password the path column
-  reads Unknown, and that is honest rather than guessed.
+  reads Unknown, and that is honest rather than guessed. Where *you* know better, pin
+  the path by hand — a deliberate statement rather than a guess.
 
 ## License
 

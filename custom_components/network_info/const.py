@@ -9,6 +9,10 @@ URL_CARDS = "/network-info-cards"
 STORAGE_VERSION = 1
 SERVICE_FORGET_DEVICE = "forget_device"
 SERVICE_IMPORT_IP_LOG = "import_ip_log"
+SERVICE_SET_PATH = "set_path"
+
+# The service value that clears a manual path override.
+PATH_AUTO = "auto"
 
 
 def storage_key(entry_id: str) -> str:
@@ -57,6 +61,18 @@ CONNECTION_UNKNOWN = "Unknown"
 
 # The wireless paths, for telling a Wi-Fi→LAN transition from a stale flag.
 WIFI_CONNECTIONS = (
+    CONNECTION_WIFI_24,
+    CONNECTION_WIFI_5,
+    CONNECTION_GUEST,
+    CONNECTION_WIFI,
+)
+
+# What a manual override may set the path to. Not "Unknown" — clearing the
+# override (PATH_AUTO) is how a device goes back to whatever is observed.
+OVERRIDABLE_CONNECTIONS = (
+    CONNECTION_ROUTER,
+    CONNECTION_ACCESS_POINT,
+    CONNECTION_LAN,
     CONNECTION_WIFI_24,
     CONNECTION_WIFI_5,
     CONNECTION_GUEST,

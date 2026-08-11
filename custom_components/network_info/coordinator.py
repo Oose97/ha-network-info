@@ -505,6 +505,13 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 rec["last_seen"] = now_iso
             dev["first_seen"] = rec["first_seen"]
             dev["last_seen"] = rec.get("last_seen")
+            # A path set by hand outranks everything observed — that is its
+            # point: it covers exactly the devices nothing can observe. The
+            # observed path was still recorded above, so clearing the
+            # override falls straight back to the latest truth.
+            if rec.get("path_override"):
+                dev["connection"] = rec["path_override"]
+                dev["path_override"] = True
 
         for key, rec in memory.items():
             if key in live_keys:
@@ -521,6 +528,9 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             dev["access_point"] = rec.get("access_point")
             if rec.get("connection"):
                 dev["connection"] = rec["connection"]
+            if rec.get("path_override"):
+                dev["connection"] = rec["path_override"]
+                dev["path_override"] = True
             dev["first_seen"] = rec.get("first_seen")
             dev["last_seen"] = rec.get("last_seen")
             devices.append(dev)
@@ -556,6 +566,38 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 replace(self.data, ip_log=list(self._ip_log))
             )
         return len(self._ip_log)
+
+    async def async_set_path(self, key: str, connection: str | None) -> bool:
+        """Pin a device's connection path by hand, or clear the pin.
+
+        The override lives in the device's memory record, so it survives
+        restarts, works in scan-only mode, and disappears with the device on
+        `forget_device`. `None` clears it, falling back to whatever the next
+        cycle observes (the last observed path immediately).
+        """
+        if self._memory is None:
+            self._memory = await self._store.async_load() or {}
+        rec = self._memory.get(key)
+        if rec is None:
+            return False
+        if connection:
+            rec["path_override"] = connection
+        elif rec.pop("path_override", None) is None:
+            return True  # clearing a pin that was never set: nothing to do
+        await self._store.async_save(self._memory)
+        if self.data is not None:
+            devices = [dict(d) for d in self.data.devices]
+            for dev in devices:
+                if (dev.get("mac") or f"ip:{dev.get('ip')}") != key:
+                    continue
+                dev["connection"] = (
+                    connection or rec.get("connection") or CONNECTION_UNKNOWN
+                )
+                dev["path_override"] = bool(connection)
+            self.async_set_updated_data(
+                replace(self.data, devices=devices, counts=_compute_counts(devices))
+            )
+        return True
 
     async def async_forget_device(self, mac: str) -> bool:
         """Drop a device from memory. An online device reappears next scan."""
@@ -678,6 +720,7 @@ def _new_device(
         "ha_device": None,
         "ha_area": None,
         "sources": sources,
+        "path_override": False,
     }
 
 
