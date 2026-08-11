@@ -66,6 +66,8 @@ Add each one on the integration card with **Add access point**. They are
 separate from the main setup, so you can add, edit or remove one at a time
 without touching anything else.
 
+![Add access point on the integration card](images/configuration_add_access_point.jpg)
+
 | Field | Meaning |
 |---|---|
 | Name | How the access point appears in the device table, e.g. the room it covers. |

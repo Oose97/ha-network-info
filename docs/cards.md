@@ -78,12 +78,16 @@ path/signal columns empty:
   in the integration's device memory and outranks the automatic one; "Use automatic
   name" returns to it. Custom-named rows show a small ✎ next to the name. The same
   is available as the `network_info.set_name` service.
+
+  ![The rename sheet — custom name, or back to the automatic one](images/network_devices_rename.jpg)
 - **Click a path badge to pin the path by hand** — a sheet offers Automatic plus
   every path. A pinned path outranks whatever scanning and router polling say
   (that is its point: it covers devices nothing can observe, like clients of an
   unpollable access point), survives restarts, and shows a small ✎ next to the
   badge. Pick Automatic to fall back to observation. The same is available as the
   `network_info.set_path` service.
+
+  ![The path sheet — Automatic plus every pinnable path](images/network_devices_change_path.jpg)
 - Offline rows are dimmed — devices the integration remembers but that are currently
   absent (`Seen by: memory`). `first seen` / `last seen` render in the browser's
   locale.
