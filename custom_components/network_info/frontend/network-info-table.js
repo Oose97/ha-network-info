@@ -82,7 +82,8 @@ class NetworkInfoTable extends HTMLElement {
     const cols = Array.isArray(this._cfg.columns) && this._cfg.columns.length
       ? this._cfg.columns.filter((c) => COLUMNS[c])
       : DEFAULT_COLUMNS.slice();
-    return { cols, sort: { key: "ip", dir: 1 }, group: false, offline: true };
+    return { cols, sort: { key: "ip", dir: 1 }, group: false, offline: true,
+      marks: true };
   }
 
   _storeKey() { return `network-info-table:${this._cfg.entity}`; }
@@ -102,6 +103,7 @@ class NetworkInfoTable extends HTMLElement {
         }
         if (typeof saved.group === "boolean") this._settings.group = saved.group;
         if (typeof saved.offline === "boolean") this._settings.offline = saved.offline;
+        if (typeof saved.marks === "boolean") this._settings.marks = saved.marks;
       }
     } catch (e) { /* corrupted storage — defaults stand */ }
   }
@@ -419,7 +421,7 @@ class NetworkInfoTable extends HTMLElement {
       switch (c) {
         case "name": {
           const key = d.mac || (d.ip ? `ip:${d.ip}` : "");
-          const mark = d.name_override
+          const mark = d.name_override && this._settings.marks
             ? `<span class="ovr" title="Name set manually">✎</span>` : "";
           const btn = key
             ? `<span class="cellacts"><button class="act" data-rename="${esc(key)}"` +
@@ -448,7 +450,7 @@ class NetworkInfoTable extends HTMLElement {
               ` data-name="${esc(d.name)}" data-ovr="${d.path_override ? "1" : "0"}"` +
               ` title="Click to set the path manually">${esc(conn)}</span>`
             : `<span class="badge ${BADGE_CLASS[conn] || "b-unknown"}">${esc(conn)}</span>`;
-          const mark = d.path_override
+          const mark = d.path_override && this._settings.marks
             ? `<span class="ovr" title="Path set manually">✎</span>`
             : "";
           return `<td>${badge}${mark}</td>`;
@@ -573,6 +575,10 @@ class NetworkInfoTable extends HTMLElement {
         <input type="checkbox" id="nit-offline" ${this._settings.offline ? "checked" : ""}>
         <label for="nit-offline">Show offline devices</label>
       </div>
+      <div class="nit-toggle">
+        <input type="checkbox" id="nit-marks" ${this._settings.marks ? "checked" : ""}>
+        <label for="nit-marks">Mark manually edited values (✎)</label>
+      </div>
       <div class="sect">Columns</div>
       ${cols.map((c, i) => colRow(c, i, true)).join("")}
       ${hidden.map((c) => colRow(c, -1, false)).join("")}
@@ -597,6 +603,11 @@ class NetworkInfoTable extends HTMLElement {
     });
     sheet.querySelector("#nit-offline").addEventListener("change", (ev) => {
       this._settings.offline = ev.target.checked;
+      this._store();
+      this._paint();
+    });
+    sheet.querySelector("#nit-marks").addEventListener("change", (ev) => {
+      this._settings.marks = ev.target.checked;
       this._store();
       this._paint();
     });

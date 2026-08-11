@@ -59,6 +59,9 @@ path/signal columns empty:
   is no path information to group by.
 - **Show offline devices** — remembered devices that are currently absent render
   dimmed; untick to hide them entirely.
+- **Mark manually edited values (✎)** — rows whose name or path was set by hand
+  carry a small pencil next to the value; untick to hide the pencils. The values
+  themselves stay as you set them either way, and the hover edit actions remain.
 - **Columns** — tick to show, arrows to reorder. The `columns:` in the YAML config
   only sets the initial state; changes here win afterwards.
 - Everything on this sheet persists per browser (localStorage, keyed by entity).
