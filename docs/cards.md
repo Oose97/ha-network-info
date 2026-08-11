@@ -33,7 +33,8 @@ columns:                              # initial visible columns + order (optiona
 ```
 
 Available columns: `name`, `ip`, `mac`, `hostname`, `vendor`, `connection`, `signal`,
-`online`, `ha_device`, `ha_area`, `router_name`, `first_seen`, `last_seen`, `sources`.
+`online`, `ha_device`, `ha_area`, `router_name`, `access_point`, `first_seen`,
+`last_seen`, `sources`.
 
 ### Toolbar
 
@@ -67,6 +68,15 @@ path/signal columns empty:
 
 - Click a column header to sort; click again to flip direction. IPs sort numerically,
   signal and the seen-timestamps sort by value.
+- **Hovering the IP cell** reveals two actions beside the address: **⧉ copy** puts
+  the IP on the clipboard (with a ✓ blink as confirmation) and **↗ open** opens
+  `http://<ip>` in a new tab. The address itself stays plain selectable text.
+- **Click a path badge to pin the path by hand** — a sheet offers Automatic plus
+  every path. A pinned path outranks whatever scanning and router polling say
+  (that is its point: it covers devices nothing can observe, like clients of an
+  unpollable access point), survives restarts, and shows a small ✎ next to the
+  badge. Pick Automatic to fall back to observation. The same is available as the
+  `network_info.set_path` service.
 - Offline rows are dimmed — devices the integration remembers but that are currently
   absent (`Seen by: memory`). `first seen` / `last seen` render in the browser's
   locale.
@@ -98,9 +108,9 @@ sort: date_desc                               # initial sort: date_desc | date_a
 
 - **Filter box** — matches date and IP.
 - **Click a header to sort** — dates chronologically, IPs numerically.
-- **Current IP highlighted** — rows matching the IP in use right now get a green
-  tint (including earlier stints on the same IP), and the newest row carries a
-  "current" pill.
+- **Current IP highlighted** — the row that *is* the current address gets a green
+  tint and a "current" pill; earlier stints on that same address get a blue tint,
+  so related history stands out without pretending to be current.
 - **Pagination** — ‹ › controls with a row-range indicator in the footer.
 - **⚙ settings sheet** — default page size and default sort, persisted per browser
   (localStorage). The YAML `page_size`/`sort` only set the initial state; **Reset**

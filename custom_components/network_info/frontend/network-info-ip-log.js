@@ -153,6 +153,9 @@ class NetworkInfoIpLog extends HTMLElement {
             -webkit-user-select: text; user-select: text; cursor: text; }
           .nil tr.current td { font-weight: 600;
             background: rgba(76, 175, 80, 0.10); }
+          /* Historical rows holding the same address as now: related, but
+             not the current one — blue instead of green. */
+          .nil tr.match td { background: rgba(33, 150, 243, 0.10); }
           .nil .cur-pill { display: inline-block; margin-left: 8px; padding: 0 8px;
             border-radius: 10px; font-size: 0.82em; font-weight: 500;
             font-family: var(--paper-font-body1_-_font-family, inherit);
@@ -277,11 +280,14 @@ class NetworkInfoIpLog extends HTMLElement {
     this._els.tbody.innerHTML = slice.length
       ? slice
           .map((r) => {
-            const isCurrent = currentIp && r.ip === currentIp;
+            const matches = currentIp && r.ip === currentIp;
             const isNewest = newest && r.date === newest.date && r.ip === newest.ip;
-            const pill = isCurrent && isNewest
+            // Green marks the row that IS the current address; earlier rows
+            // that held the same address are related history, shown in blue.
+            const cls = matches ? (isNewest ? "current" : "match") : "";
+            const pill = matches && isNewest
               ? '<span class="cur-pill">current</span>' : "";
-            return `<tr${isCurrent ? ' class="current"' : ""}><td>${escIp(r.date)}</td><td>${escIp(r.ip)}${pill}</td></tr>`;
+            return `<tr${cls ? ` class="${cls}"` : ""}><td>${escIp(r.date)}</td><td>${escIp(r.ip)}${pill}</td></tr>`;
           })
           .join("")
       : `<tr><td colspan="2">No entries</td></tr>`;
