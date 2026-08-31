@@ -108,7 +108,20 @@ class NetworkInfoIpLog extends HTMLElement {
 
   getCardSize() { return 5; }
 
-  static getStubConfig() { return { entity: "sensor.network_info_external_ip_log" }; }
+  static getConfigElement() {
+    return document.createElement("network-info-ip-log-editor");
+  }
+
+  // Picked from what is actually loaded, so adding the card from the picker
+  // lands on a working entity even when the sensor was renamed. The `log`
+  // attribute is what makes a sensor this card's kind of sensor.
+  static getStubConfig(hass) {
+    const states = (hass && hass.states) || {};
+    const hit = Object.keys(states).find(
+      (id) => id.startsWith("sensor.") && Array.isArray((states[id].attributes || {}).log)
+    );
+    return { entity: hit || "sensor.network_info_external_ip_log" };
+  }
 
   _rows() {
     const st = this._hass && this._hass.states[this._cfg.entity];
@@ -361,3 +374,122 @@ window.customCards.push({
   description:
     "External IP change history from the Network Info integration — filterable, sortable, paginated.",
 });
+
+// ── visual editor ────────────────────────────────────────────
+// A schema-driven <ha-form>, so the card can be set up from the dashboard's
+// own card editor instead of by hand in YAML. Page size and sort are the
+// card's starting state; the ⚙ sheet inside the card overrides both per
+// browser, which is why they are worded as defaults here.
+const NIL_SCHEMA = [
+  {
+    name: "entity",
+    required: true,
+    selector: { entity: { filter: [{ integration: "network_info", domain: "sensor" }] } },
+  },
+  { name: "title", selector: { text: {} } },
+  {
+    name: "page_size",
+    selector: {
+      select: {
+        mode: "dropdown",
+        options: PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} rows` })),
+      },
+    },
+  },
+  {
+    name: "sort",
+    selector: {
+      select: {
+        mode: "dropdown",
+        options: SORTS.map((s) => ({
+          value: `${s.key}_${s.dir === -1 ? "desc" : "asc"}`,
+          label: s.label,
+        })),
+      },
+    },
+  },
+];
+
+const NIL_LABELS = {
+  entity: "IP log sensor",
+  title: "Title",
+  page_size: "Rows per page",
+  sort: "Sort",
+};
+
+const NIL_HELPERS = {
+  entity: "The Network Info sensor carrying the external IP change log.",
+  title: "Card heading.",
+  page_size: "Where the pager starts. Each browser can change it from the card's ⚙ sheet.",
+  sort: "Where the sort starts. Clicking a header, or the ⚙ sheet, overrides it per browser.",
+};
+
+// The select above hands back strings; the card reads this one as a number.
+const NIL_NUMBERS = new Set(["page_size"]);
+
+class NetworkInfoIpLogEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = Object.assign({}, config);
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._form) this._form.hass = hass;
+  }
+
+  // What the card falls back to when the option is absent. Shown in the form
+  // so the fields read as the card actually behaves rather than as blanks —
+  // and stripped again on the way out, so an untouched default never lands
+  // in the YAML.
+  _defaults() {
+    return {
+      entity: "sensor.network_info_external_ip_log",
+      title: "External IP log",
+      page_size: 10,
+      sort: "date_desc",
+    };
+  }
+
+  _emit(value) {
+    const defaults = this._defaults();
+    const out = this._config.type ? { type: this._config.type } : {};
+    for (const [k, raw] of Object.entries(value || {})) {
+      if (k === "type") continue;
+      // A cleared field comes back as "" — leaving it out lets the card's own
+      // default apply again instead of writing a blank into the YAML.
+      if (raw === "" || raw === undefined || raw === null) continue;
+      const v = NIL_NUMBERS.has(k) ? Number(raw) : raw;
+      if (NIL_NUMBERS.has(k) && !Number.isFinite(v)) continue;
+      if (k !== "entity" && JSON.stringify(v) === JSON.stringify(defaults[k])) continue;
+      out[k] = v;
+    }
+    this._config = out;
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: out }, bubbles: true, composed: true,
+    }));
+  }
+
+  _render() {
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.computeLabel = (s) => NIL_LABELS[s.name] || s.name;
+      this._form.computeHelper = (s) => NIL_HELPERS[s.name] || "";
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        this._emit(ev.detail.value);
+      });
+      this.appendChild(this._form);
+    }
+    if (this._hass) this._form.hass = this._hass;
+    this._form.schema = NIL_SCHEMA;
+    // The select works in strings; the stored value is a number.
+    const data = Object.assign(this._defaults(), this._config);
+    data.page_size = String(data.page_size);
+    this._form.data = data;
+  }
+}
+
+if (!customElements.get("network-info-ip-log-editor")) {
+  customElements.define("network-info-ip-log-editor", NetworkInfoIpLogEditor);
+}

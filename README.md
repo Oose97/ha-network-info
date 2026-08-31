@@ -123,6 +123,8 @@ Go to [Cards](docs/cards.md) for more details.
   router access, disabled with a hint otherwise.
 - **Network Info IP Log** — the external IP change history: filterable, sortable,
   paginated, with default page size and sort in its settings sheet.
+- **Visual editor** — both cards are set up from the dashboard's own card editor: entity
+  picker, columns, page size and sort as form fields, no YAML to write.
 
 ### Releasing
 
