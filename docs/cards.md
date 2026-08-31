@@ -1,9 +1,16 @@
 # Cards
 
-The integration ships one card and registers it as a Lovelace resource by itself
-(storage-mode dashboards). YAML-mode dashboards manage resources manually — the URL to
-add is logged at startup. Card updates bust the browser cache via a `?v=<version>`
+The integration ships two cards and registers them as Lovelace resources by itself
+(storage-mode dashboards). YAML-mode dashboards manage resources manually — the URLs to
+add are logged at startup. Card updates bust the browser cache via a `?v=<version>`
 query on the resource.
+
+Both have a **visual editor**: picking one from the card picker, or clicking the pencil
+on a card already on a dashboard, opens a form covering every option documented below.
+The fields start on the card's own defaults, and an option left at its default is not
+written to the YAML — so the editor and a hand-written card come out the same. The
+per-browser view settings (the ⚙ sheet's columns, sorting, grouping, page size) are not
+card configuration and stay where they are.
 
 ## Network Info Table
 

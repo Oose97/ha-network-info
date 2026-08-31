@@ -128,7 +128,20 @@ class NetworkInfoTable extends HTMLElement {
 
   getCardSize() { return 8; }
 
-  static getStubConfig() { return { entity: "sensor.network_info_devices" }; }
+  static getConfigElement() {
+    return document.createElement("network-info-table-editor");
+  }
+
+  // Picked from what is actually loaded, so adding the card from the picker
+  // lands on a working entity even when the sensor was renamed. The `devices`
+  // attribute is what makes a sensor this card's kind of sensor.
+  static getStubConfig(hass) {
+    const states = (hass && hass.states) || {};
+    const hit = Object.keys(states).find(
+      (id) => id.startsWith("sensor.") && Array.isArray((states[id].attributes || {}).devices)
+    );
+    return { entity: hit || "sensor.network_info_devices" };
+  }
 
   // ── data ─────────────────────────────────────────────────
   _attrs() {
@@ -649,3 +662,108 @@ window.customCards.push({
   description:
     "Device table for the Network Info integration — filterable, configurable columns, optional grouping by connection path.",
 });
+
+// ── visual editor ────────────────────────────────────────────
+// A schema-driven <ha-form>, so the card can be set up from the dashboard's
+// own card editor instead of by hand in YAML. It configures where the card
+// starts; the ⚙ sheet inside the card keeps the per-browser view settings
+// (visible columns, sort, grouping, offline rows), which are deliberately
+// not card configuration and are not repeated here.
+const NIT_SCHEMA = [
+  {
+    name: "entity",
+    required: true,
+    selector: { entity: { filter: [{ integration: "network_info", domain: "sensor" }] } },
+  },
+  { name: "title", selector: { text: {} } },
+  {
+    name: "columns",
+    selector: {
+      select: {
+        multiple: true,
+        mode: "dropdown",
+        options: Object.entries(COLUMNS).map(([value, c]) => ({ value, label: c.label })),
+      },
+    },
+  },
+  { name: "max_height", selector: { text: {} } },
+];
+
+const NIT_LABELS = {
+  entity: "Device sensor",
+  title: "Title",
+  columns: "Columns",
+  max_height: "Maximum height",
+};
+
+const NIT_HELPERS = {
+  entity: "The Network Info sensor carrying the device list.",
+  title: "Card heading.",
+  columns: "Which columns to show, in the order picked. Each browser can still "
+    + "change this from the card's ⚙ sheet.",
+  max_height: "CSS length the table scrolls inside — 70vh, 480px. Bounding the "
+    + "height is what keeps the header sticky.",
+};
+
+class NetworkInfoTableEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = Object.assign({}, config);
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._form) this._form.hass = hass;
+  }
+
+  // What the card falls back to when the option is absent. Shown in the form
+  // so the fields read as the card actually behaves rather than as blanks —
+  // and stripped again on the way out, so an untouched default never lands
+  // in the YAML.
+  _defaults() {
+    return {
+      entity: "sensor.network_info_devices",
+      title: "Network devices",
+      columns: DEFAULT_COLUMNS.slice(),
+      max_height: "70vh",
+    };
+  }
+
+  _emit(value) {
+    const defaults = this._defaults();
+    const out = this._config.type ? { type: this._config.type } : {};
+    for (const [k, v] of Object.entries(value || {})) {
+      if (k === "type") continue;
+      // A cleared field comes back as "" — leaving it out lets the card's own
+      // default apply again instead of writing a blank into the YAML.
+      if (v === "" || v === undefined || v === null) continue;
+      if (Array.isArray(v) && !v.length) continue;
+      if (k !== "entity" && JSON.stringify(v) === JSON.stringify(defaults[k])) continue;
+      out[k] = v;
+    }
+    this._config = out;
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: out }, bubbles: true, composed: true,
+    }));
+  }
+
+  _render() {
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.computeLabel = (s) => NIT_LABELS[s.name] || s.name;
+      this._form.computeHelper = (s) => NIT_HELPERS[s.name] || "";
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        this._emit(ev.detail.value);
+      });
+      this.appendChild(this._form);
+    }
+    if (this._hass) this._form.hass = this._hass;
+    this._form.schema = NIT_SCHEMA;
+    this._form.data = Object.assign(this._defaults(), this._config);
+  }
+}
+
+if (!customElements.get("network-info-table-editor")) {
+  customElements.define("network-info-table-editor", NetworkInfoTableEditor);
+}
