@@ -12,6 +12,11 @@ SERVICE_IMPORT_IP_LOG = "import_ip_log"
 SERVICE_SET_PATH = "set_path"
 SERVICE_SET_NAME = "set_name"
 
+# Fired on the event bus when a device's presence changes between cycles.
+EVENT_DEVICE_ONLINE = f"{DOMAIN}_device_online"
+EVENT_DEVICE_OFFLINE = f"{DOMAIN}_device_offline"
+EVENT_NEW_DEVICE = f"{DOMAIN}_new_device"
+
 # The service value that clears a manual path override.
 PATH_AUTO = "auto"
 

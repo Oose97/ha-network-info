@@ -28,6 +28,10 @@ device also gets its connection path, signal level and the router's name for it.
   last-seen timestamps and stays listed when it goes offline — surviving restarts and
   working identically in scan-only mode. The router only enriches the list
   ([details](docs/scanning.md#device-memory)).
+- **Tells you when something joins or leaves** — device triggers for a device coming
+  online, going offline, or being seen for the first time, pickable from the device
+  list in the automation editor (or by MAC, IP or name); the underlying events work
+  in YAML too ([details](docs/entities.md#events-and-triggers)).
 - **Knows your Home Assistant**: discovered devices are matched against the HA device
   registry, so they show up with their HA names and areas; HA's own IP is detected and
   pre-fills the whole setup form.
@@ -84,6 +88,8 @@ Go to [Entities & services](docs/entities.md) for more details.
   rescans from the UI or automations.
 - Opt-in external IP sensor and change-log sensor — the log's state is its row count,
   so "the count went up" is a clean IP-changed trigger.
+- Presence events (`network_info_device_online` / `_offline` / `_new_device`) and
+  matching device triggers for the automation editor.
 - A `set_path` service to pin a device's connection path by hand where nothing can
   observe it, a `set_name` service to name a device yourself, and a `forget_device`
   service to prune stale entries from the device memory.
@@ -135,33 +141,46 @@ Go to [Releasing](docs/releasing.md) for more details.
 
 ## Automations
 
-The devices sensor holds the **online count** as state and the full list plus totals as
-attributes, so "the total went up" is the signal that a brand-new device appeared.
+The integration fires an event whenever a device comes online, goes offline, or is
+seen for the first time, and offers the same as device triggers in the automation
+editor — with a dropdown of your known devices ([details](docs/entities.md#events-and-triggers)).
+
+**Get a push notification when one particular device joins:**
+
+```yaml
+alias: "Network: workshop printer is on"
+triggers:
+  - trigger: device
+    domain: network_info
+    device_id: <the Network Info device>   # picked in the editor
+    type: device_online
+    network_device: "aa:bb:cc:dd:ee:ff"   # picked from the dropdown
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: Device online
+      message: >-
+        {{ trigger.event.data.name }} joined at {{ trigger.event.data.ip }}
+        via {{ trigger.event.data.connection }}
+mode: single
+```
 
 **Notify when a never-seen device joins the network:**
 
 ```yaml
 alias: "Network: new device joined"
 triggers:
-  - trigger: state
-    entity_id: sensor.network_info_devices
-    not_from: ["unknown", "unavailable"]
-    not_to: ["unknown", "unavailable"]
-conditions:
-  - condition: template
-    value_template: >-
-      {{ (trigger.to_state.attributes.counts.total | int(0)) >
-         (trigger.from_state.attributes.counts.total | int(0)) }}
+  - trigger: event
+    event_type: network_info_new_device
 actions:
-  - variables:
-      newest: >-
-        {{ trigger.to_state.attributes.devices
-           | sort(attribute='first_seen') | last }}
   - action: notify.notify
     data:
       title: New device on the network
-      message: "{{ newest.name }} ({{ newest.ip }}) via {{ newest.connection }}"
-mode: single
+      message: >-
+        {{ trigger.event.data.name }} ({{ trigger.event.data.ip }},
+        {{ trigger.event.data.vendor or 'unknown vendor' }})
+        via {{ trigger.event.data.connection }}
+mode: queued
 ```
 
 **Scan immediately when someone arrives home:**

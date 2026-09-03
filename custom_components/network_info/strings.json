@@ -198,5 +198,24 @@
         "reconfigure_successful": "Access point updated."
       }
     }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "device_online": "A network device came online",
+      "device_offline": "A network device went offline",
+      "new_device": "A device was seen on the network for the first time"
+    },
+    "extra_fields": {
+      "network_device": "Device",
+      "mac": "MAC address",
+      "ip": "IP address",
+      "name": "Name"
+    },
+    "extra_fields_descriptions": {
+      "network_device": "Pick a known device from the list. Leave every field empty to trigger for any device.",
+      "mac": "Match by MAC address, instead of or in addition to the picked device.",
+      "ip": "Match by IP address — useful for devices whose MAC address changes (private Wi-Fi addresses).",
+      "name": "Match by name or hostname, case-insensitive."
+    }
   }
 }
