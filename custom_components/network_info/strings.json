@@ -217,5 +217,47 @@
       "ip": "Match by IP address — useful for devices whose MAC address changes (private Wi-Fi addresses).",
       "name": "Match by name or hostname, case-insensitive."
     }
+  },
+  "triggers": {
+    "device_online": {
+      "name": "Device came online",
+      "description": "Triggers when a device on the network comes online. Leave every field empty to trigger for any device.",
+      "fields": {
+        "mac": {
+          "name": "MAC address",
+          "description": "Only this device, by MAC address. Copy it from the device table card."
+        },
+        "ip": {
+          "name": "IP address",
+          "description": "Only the device at this IP address — useful for devices whose MAC address changes (private Wi-Fi addresses)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Only a device with this name or hostname (case-insensitive)."
+        }
+      }
+    },
+    "device_offline": {
+      "name": "Device went offline",
+      "description": "Triggers when a device on the network goes offline. Leave every field empty to trigger for any device.",
+      "fields": {
+        "mac": {
+          "name": "MAC address",
+          "description": "Only this device, by MAC address. Copy it from the device table card."
+        },
+        "ip": {
+          "name": "IP address",
+          "description": "Only the device at this IP address — useful for devices whose MAC address changes (private Wi-Fi addresses)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Only a device with this name or hostname (case-insensitive)."
+        }
+      }
+    },
+    "new_device": {
+      "name": "New device seen",
+      "description": "Triggers when a device is seen on the network for the very first time."
+    }
   }
 }

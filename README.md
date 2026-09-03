@@ -28,10 +28,11 @@ device also gets its connection path, signal level and the router's name for it.
   last-seen timestamps and stays listed when it goes offline — surviving restarts and
   working identically in scan-only mode. The router only enriches the list
   ([details](docs/scanning.md#device-memory)).
-- **Tells you when something joins or leaves** — device triggers for a device coming
-  online, going offline, or being seen for the first time, pickable from the device
-  list in the automation editor (or by MAC, IP or name); the underlying events work
-  in YAML too ([details](docs/entities.md#events-and-triggers)).
+- **Tells you when something joins or leaves** — triggers for a device coming online,
+  going offline, or being seen for the first time, offered under Network Info in the
+  automation editor (match by MAC, IP or name, or pick from the device list via the
+  device-trigger route); the underlying events work in YAML too
+  ([details](docs/entities.md#events-and-triggers)).
 - **Knows your Home Assistant**: discovered devices are matched against the HA device
   registry, so they show up with their HA names and areas; HA's own IP is detected and
   pre-fills the whole setup form.
@@ -150,18 +151,16 @@ editor — with a dropdown of your known devices ([details](docs/entities.md#eve
 ```yaml
 alias: "Network: workshop printer is on"
 triggers:
-  - trigger: device
-    domain: network_info
-    device_id: <the Network Info device>   # picked in the editor
-    type: device_online
-    network_device: "aa:bb:cc:dd:ee:ff"   # picked from the dropdown
+  - trigger: network_info.device_online
+    target:
+      device_id: <the Network Info device>   # picked in the editor
+    options:
+      mac: "aa:bb:cc:dd:ee:ff"               # or ip: / name:
 actions:
   - action: notify.mobile_app_your_phone
     data:
       title: Device online
-      message: >-
-        {{ trigger.event.data.name }} joined at {{ trigger.event.data.ip }}
-        via {{ trigger.event.data.connection }}
+      message: "{{ trigger.name }} joined at {{ trigger.ip }} via {{ trigger.connection }}"
 mode: single
 ```
 

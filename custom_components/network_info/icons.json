@@ -1,0 +1,13 @@
+{
+  "triggers": {
+    "device_online": {
+      "trigger": "mdi:lan-connect"
+    },
+    "device_offline": {
+      "trigger": "mdi:lan-disconnect"
+    },
+    "new_device": {
+      "trigger": "mdi:lan-pending"
+    }
+  }
+}

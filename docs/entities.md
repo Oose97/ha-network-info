@@ -72,31 +72,39 @@ Event data: `entry_id`, `key` (MAC, or `ip:<address>` when no MAC is known),
 `mac`, `ip`, `name`, `hostname`, `vendor`, `connection`, `access_point`,
 `signal`, `first_seen`, `last_seen`.
 
-The same three appear as **device triggers** on the Network Info device in the
-automation editor — _Settings → Automations → Add trigger → Device → Network
-Info_ — with optional match fields: a dropdown of every known device (offline
-ones included), plus MAC, IP and name/hostname for matching devices without a
-fixed identity, such as a phone using a private Wi-Fi address. Every field
-given must match; none given means any device. A brand-new device is by
-definition not in the list yet, so that trigger has no fields.
+The same three are offered in the automation editor, two ways:
+
+- **By target → Network Info** — _Device came online_, _Device went offline_,
+  _New device seen_. The optional MAC, IP and name fields say which device to
+  wait for (copy the MAC or IP from the device table card's hover actions);
+  name also matches the hostname, case-insensitively. Every field given must
+  match; none given means any device. A brand-new device is by definition not
+  known yet, so that trigger has no fields.
+- **By type → Device → Network Info** — the same triggers as *device
+  triggers*, where the editor can build a **dropdown of every known device**
+  (offline ones included) on demand, alongside the same MAC / IP / name fields.
 
 The classic case — a push notification when one particular device joins:
 
 ```yaml
 triggers:
-  - trigger: device
-    domain: network_info
-    device_id: <the Network Info device>     # picked in the editor
-    type: device_online
-    network_device: "aa:bb:cc:dd:ee:ff"     # picked from the dropdown
+  - trigger: network_info.device_online
+    target:
+      device_id: <the Network Info device>   # picked in the editor
+    options:
+      mac: "aa:bb:cc:dd:ee:ff"
 actions:
   - action: notify.mobile_app_your_phone
     data:
       title: "Device online"
       message: >-
-        {{ trigger.event.data.name }} joined at {{ trigger.event.data.ip }}
-        ({{ trigger.event.data.connection }})
+        {{ trigger.name }} joined at {{ trigger.ip }} ({{ trigger.connection }})
 ```
+
+The trigger variables carry the event data flat (`trigger.name`, `trigger.ip`,
+`trigger.mac`, `trigger.connection`, …) and the raw event as `trigger.event`.
+The device-trigger form (`trigger: device`, `type: device_online`,
+`network_device: <key>`) exposes the same via `trigger.event.data`.
 
 The plain event form works everywhere, YAML included:
 

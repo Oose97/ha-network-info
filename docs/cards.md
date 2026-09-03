@@ -82,7 +82,7 @@ path/signal columns empty:
   the IP on the clipboard (with a ✓ blink as confirmation) and **↗ open** opens the
   device's address in a new tab (plain HTTP — the near-universal default for LAN
   device pages; HTTPS-only devices redirect by themselves). The address itself
-  stays plain selectable text.
+  stays plain selectable text. The MAC cell has the same copy action.
 - **Hovering the Name cell** reveals a ✎ rename action — the custom name is stored
   in the integration's device memory and outranks the automatic one; "Use automatic
   name" returns to it. Custom-named rows show a small ✎ next to the name. The same

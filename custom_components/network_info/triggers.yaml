@@ -1,0 +1,33 @@
+# Presence triggers, offered under the Network Info device in the automation
+# editor's "by target" view. The optional fields name the device to wait for;
+# every given field must match, none means any device.
+
+.presence: &presence
+  target:
+    device:
+      integration: network_info
+  fields:
+    mac:
+      required: false
+      example: "aa:bb:cc:dd:ee:ff"
+      selector:
+        text:
+    ip:
+      required: false
+      example: "192.168.1.23"
+      selector:
+        text:
+    name:
+      required: false
+      example: "Living room TV"
+      selector:
+        text:
+
+device_online: *presence
+device_offline: *presence
+
+# A newcomer is by definition not known yet, so there is nothing to match on.
+new_device:
+  target:
+    device:
+      integration: network_info
