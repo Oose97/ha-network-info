@@ -453,8 +453,13 @@ class NetworkInfoTable extends HTMLElement {
             `<button class="act" data-open="${ip}" title="Open in a new tab">↗</button>` +
             `</span></td>`;
         }
-        case "mac":
-          return `<td class="mono">${esc(d[c])}</td>`;
+        case "mac": {
+          if (!d.mac) return "<td></td>";
+          const mac = esc(d.mac);
+          return `<td class="mono">${mac}<span class="cellacts">` +
+            `<button class="act" data-copy="${mac}" title="Copy MAC">⧉</button>` +
+            `</span></td>`;
+        }
         case "connection": {
           const conn = d.connection || "Unknown";
           const key = d.mac || (d.ip ? `ip:${d.ip}` : "");

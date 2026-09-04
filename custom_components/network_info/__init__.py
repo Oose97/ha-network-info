@@ -30,7 +30,7 @@ from .const import (
     ip_log_storage_key,
     storage_key,
 )
-from .coordinator import NetworkInfoCoordinator
+from .coordinator import NetworkInfoCoordinator, device_key
 
 PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR]
 
@@ -53,11 +53,6 @@ SET_NAME_SCHEMA = vol.Schema(
 )
 
 
-def _device_key(value: str) -> str:
-    """Normalize the service's device reference (MAC, or ip:<ip>)."""
-    return value.strip().lower().replace("-", ":")
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: NetworkInfoConfigEntry) -> bool:
     """Set up Network Info from a config entry."""
     coordinator = NetworkInfoCoordinator(hass, entry)
@@ -77,7 +72,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
         return
 
     async def _handle_forget(call: ServiceCall) -> None:
-        mac = _device_key(str(call.data["mac"]))
+        mac = device_key(str(call.data["mac"]))
         forgotten = False
         for entry in hass.config_entries.async_loaded_entries(DOMAIN):
             coordinator: NetworkInfoCoordinator = entry.runtime_data
@@ -90,7 +85,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
     )
 
     async def _handle_set_path(call: ServiceCall) -> None:
-        key = _device_key(str(call.data["mac"]))
+        key = device_key(str(call.data["mac"]))
         path = call.data["path"]
         connection = None if path == PATH_AUTO else path
         found = False
@@ -105,7 +100,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
     )
 
     async def _handle_set_name(call: ServiceCall) -> None:
-        key = _device_key(str(call.data["mac"]))
+        key = device_key(str(call.data["mac"]))
         name = str(call.data["name"]).strip()
         found = False
         for entry in hass.config_entries.async_loaded_entries(DOMAIN):

@@ -41,6 +41,9 @@ from .const import (
     CONNECTION_LAN,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
+    EVENT_DEVICE_OFFLINE,
+    EVENT_DEVICE_ONLINE,
+    EVENT_NEW_DEVICE,
     EXTERNAL_IP_URL,
     IP_LOG_MAX_ROWS,
     LABEL_MAIN_ROUTER,
@@ -203,6 +206,11 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         self._ip_log: list[dict[str, str]] | None = None
         self._external_ip: str | None = None
         self._ip_warned = False
+        # Presence as of the last cycle, for firing transitions. None until
+        # a first cycle has established a baseline — a restart must not
+        # announce every device as newly online.
+        self._online_keys: set[str] | None = None
+        self._new_keys: set[str] = set()
 
     async def _async_update_data(self) -> NetworkData:
         if self._memory is None:
@@ -252,6 +260,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         self._apply_memory(devices, paths_observed)
         self._enrich_from_registries(devices)
         devices.sort(key=_ip_sort_key)
+        self._fire_transitions(devices)
 
         counts = _compute_counts(devices)
 
@@ -475,6 +484,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             if rec is None:
                 rec = {"first_seen": now_iso}
                 memory[key] = rec
+                self._new_keys.add(key)
             for field in (
                 "ip", "mac", "hostname", "vendor", "router_name", "access_point"
             ):
@@ -539,6 +549,46 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
 
         self._store.async_delay_save(lambda: memory, 30)
 
+    def _fire_transitions(self, devices: list[dict[str, Any]]) -> None:
+        """Announce presence changes since the previous cycle on the event bus.
+
+        Three events: a device came online, went offline, or was seen for the
+        very first time (which also counts as coming online). The first cycle
+        after a start only sets the baseline.
+        """
+        online_now = {_key_of(dev) for dev in devices if dev["online"]}
+        previous, self._online_keys = self._online_keys, online_now
+        new_keys, self._new_keys = self._new_keys, set()
+        if previous is None:
+            return
+        for dev in devices:
+            key = _key_of(dev)
+            if key in new_keys:
+                self._fire(EVENT_NEW_DEVICE, key, dev)
+            if dev["online"] and key not in previous:
+                self._fire(EVENT_DEVICE_ONLINE, key, dev)
+            elif not dev["online"] and key in previous:
+                self._fire(EVENT_DEVICE_OFFLINE, key, dev)
+
+    def _fire(self, event_type: str, key: str, dev: dict[str, Any]) -> None:
+        self.hass.bus.async_fire(
+            event_type,
+            {
+                "entry_id": self.config_entry.entry_id,
+                "key": key,
+                "mac": dev.get("mac"),
+                "ip": dev.get("ip"),
+                "name": dev.get("name"),
+                "hostname": dev.get("hostname"),
+                "vendor": dev.get("vendor"),
+                "connection": dev.get("connection"),
+                "access_point": dev.get("access_point"),
+                "signal": dev.get("signal"),
+                "first_seen": dev.get("first_seen"),
+                "last_seen": dev.get("last_seen"),
+            },
+        )
+
     @property
     def ip_log_enabled(self) -> bool:
         return self._log_external_ip
@@ -590,7 +640,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         if self.data is not None:
             devices = [dict(d) for d in self.data.devices]
             for dev in devices:
-                if (dev.get("mac") or f"ip:{dev.get('ip')}") != key:
+                if _key_of(dev) != key:
                     continue
                 dev["connection"] = (
                     connection or rec.get("connection") or CONNECTION_UNKNOWN
@@ -621,7 +671,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         if self.data is not None:
             devices = [dict(d) for d in self.data.devices]
             for dev in devices:
-                if (dev.get("mac") or f"ip:{dev.get('ip')}") != key:
+                if _key_of(dev) != key:
                     continue
                 dev["name_override"] = name or None
                 dev["name"] = (
@@ -644,11 +694,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             return False
         await self._store.async_save(self._memory)
         if self.data is not None:
-            devices = [
-                d
-                for d in self.data.devices
-                if (d.get("mac") or f"ip:{d.get('ip')}") != key
-            ]
+            devices = [d for d in self.data.devices if _key_of(d) != key]
             self.async_set_updated_data(
                 replace(self.data, devices=devices, counts=_compute_counts(devices))
             )
@@ -760,6 +806,16 @@ def _new_device(
         "path_override": False,
         "name_override": None,
     }
+
+
+def device_key(value: str) -> str:
+    """Normalize a device reference: a MAC, or ip:<address> when none is known."""
+    return value.strip().lower().replace("-", ":")
+
+
+def _key_of(dev: dict[str, Any]) -> str:
+    """The memory key of a device row."""
+    return dev.get("mac") or f"ip:{dev.get('ip')}"
 
 
 def _host_ip(host: str) -> str:
