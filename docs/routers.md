@@ -177,7 +177,10 @@ envelope.
 
 Clients come from `admin/status?form=client_status`, whose entries carry a
 `wire_type` of `wired`, `2.4G` or `5G` — the band, stated directly — with the
-wireless statistics page as a fallback.
+wireless statistics page as a fallback. An access point with nobody connected
+to it answers with an empty list, which counts as reachable; the provider only
+reports "did not return a client list" when neither page yields a list at all,
+and the debug log then says what each page answered instead.
 
 Confirmed with the Archer C6 on **firmware 1.3 and newer**. Firmware **1.1 is
 confirmed not to work** — it refuses the login without an error code — so
