@@ -369,12 +369,22 @@ class TPLinkProvider(RouterProvider):
         return clients
 
     async def _async_read_clients(self) -> dict[str, RouterClient] | None:
+        """The client list, or None when no endpoint produced one.
+
+        An empty list is an answer: a downstream access point with nobody
+        associated to it reports exactly that, and must count as reachable.
+        Only when no endpoint returns a recognisable list at all — a stale
+        session, a 403, an error payload, an unknown shape — is None returned,
+        which is what prompts the single re-login in the caller.
+        """
+        seen_empty = False
         for path, operation in (
             (f"/cgi-bin/luci/;stok={self._stok}/admin/status?form=client_status",
              "read"),
             (f"/cgi-bin/luci/;stok={self._stok}/admin/wireless?form=statistics",
              "load"),
         ):
+            form = path.rsplit("form=", 1)[-1]
             try:
                 if self._variant == "signed":
                     payload = self._unwrap(
@@ -383,24 +393,46 @@ class TPLinkProvider(RouterProvider):
                     )
                 else:
                     payload = await self._post(path, {"operation": operation})
-            except RouterConnectionError:
+            except RouterConnectionError as err:
+                _LOGGER.debug("TP-Link ?form=%s failed: %s", form, err)
                 continue
             if not payload.get("success", True):
+                _LOGGER.debug(
+                    "TP-Link ?form=%s answered an error: %s", form, str(payload)[:200]
+                )
                 continue
             clients = _parse_clients(payload.get("data"))
+            if clients is None:
+                _LOGGER.debug(
+                    "TP-Link ?form=%s had no client list in it: %s",
+                    form,
+                    str(payload)[:200],
+                )
+                continue
             if clients:
                 return clients
-        return None
+            # A real list with nothing in it. Keep looking in case the other
+            # endpoint knows more, but this already counts as an answer.
+            _LOGGER.debug("TP-Link ?form=%s lists no clients", form)
+            seen_empty = True
+        return {} if seen_empty else None
 
 
-def _parse_clients(data: Any) -> dict[str, RouterClient]:
-    """Read the client lists, whichever grouping this firmware uses."""
+def _parse_clients(data: Any) -> dict[str, RouterClient] | None:
+    """Read the client lists, whichever grouping this firmware uses.
+
+    Returns None when ``data`` carries no list at all — an unexpected shape,
+    or an error body that slipped past the success flag — and a dict,
+    possibly empty, when it does.
+    """
     clients: dict[str, RouterClient] = {}
     groups: list[tuple[str, list[Any]]] = []
     if isinstance(data, dict):
         groups = [(k, v) for k, v in data.items() if isinstance(v, list)]
     elif isinstance(data, list):
         groups = [("", data)]
+    if not groups:
+        return None
 
     for group_name, items in groups:
         default = CONNECTION_GUEST if "guest" in group_name.lower() else None
