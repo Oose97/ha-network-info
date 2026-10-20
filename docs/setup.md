@@ -25,6 +25,7 @@ network connection:
 |---|---|
 | IP range(s) to scan | Anything nmap accepts: CIDR (`192.168.1.0/24`), dash ranges (`192.168.1.1-254`), or several ranges separated by spaces. |
 | Scan interval | Minutes between automatic scans. Default 15, allowed 1–1440. A `/24` ping sweep takes a few seconds, so short intervals are harmless. |
+| Forget devices not seen for | Optional, in days. A device that has not been online for this long is removed from the device memory together with its history, at the next scan. Empty = keep every device indefinitely ([details](scanning.md#device-memory)). |
 | Router brand | **None (scanning only)** by default. Pick your router's brand to get per-device connection paths and signal — the supported brands come from the [router catalog](routers.md#the-brand-catalog). |
 | Track external IP | Fetches the network's public IP from `api.ipify.org` each scan cycle and publishes it as a sensor. This is the integration's **only** internet call, and only when enabled. |
 | Log external IP changes | Keeps a persistent log of every external IP change. Requires **Track external IP** to be enabled. The log survives restarts and is capped at the newest 500 entries. |
@@ -94,7 +95,7 @@ stops wireless clients from being reported as wired.
 ## Changing settings later
 
 Open the integration's **Configure** dialog — the same form, editing the scan range,
-interval and router credentials in place. Saving reloads the integration.
+interval, retention and router credentials in place. Saving reloads the integration.
 
 ## Multiple networks
 

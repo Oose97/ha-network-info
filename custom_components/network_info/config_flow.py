@@ -41,6 +41,7 @@ from .const import (
     CONF_EXTERNAL_IP,
     CONF_EXTERNAL_IP_LOG,
     CONF_IP_RANGE,
+    CONF_RETENTION_DAYS,
     CONF_ROUTER_BRAND,
     CONF_ROUTER_HOST,
     CONF_ROUTER_PASSWORD,
@@ -98,6 +99,21 @@ def _base_schema(
                     step=1,
                     mode=NumberSelectorMode.BOX,
                     unit_of_measurement="min",
+                )
+            ),
+            # A suggested value rather than a default: a default would be
+            # reinstated whenever the field is submitted empty, and empty is
+            # how "keep forever" is expressed.
+            vol.Optional(
+                CONF_RETENTION_DAYS,
+                description={"suggested_value": defaults.get(CONF_RETENTION_DAYS)},
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=1,
+                    max=3650,
+                    step=1,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="days",
                 )
             ),
             vol.Required(
@@ -273,11 +289,23 @@ def _errors_on(errors: dict[str, str], *fields: str) -> dict[str, str]:
     }
 
 
+def _retention_days(value: Any) -> int | None:
+    """Whole days, or None for "keep forever" (empty or zero)."""
+    if value in (None, ""):
+        return None
+    try:
+        days = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    return days if days > 0 else None
+
+
 def _normalize_base(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
     errors: dict[str, str] = {}
     data = {
         CONF_IP_RANGE: user_input[CONF_IP_RANGE].strip(),
         CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
+        CONF_RETENTION_DAYS: _retention_days(user_input.get(CONF_RETENTION_DAYS)),
         CONF_ROUTER_BRAND: user_input.get(CONF_ROUTER_BRAND, ROUTER_BRAND_NONE),
         CONF_EXTERNAL_IP: bool(user_input.get(CONF_EXTERNAL_IP)),
         CONF_EXTERNAL_IP_LOG: bool(user_input.get(CONF_EXTERNAL_IP_LOG)),

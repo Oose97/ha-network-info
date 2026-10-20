@@ -46,6 +46,8 @@ ROLE_ACCESS_POINT = "access_point"
 LABEL_MAIN_ROUTER = "Main router"
 CONF_EXTERNAL_IP = "external_ip"
 CONF_EXTERNAL_IP_LOG = "external_ip_log"
+# Days an offline device stays remembered; unset/0 = indefinitely.
+CONF_RETENTION_DAYS = "retention_days"
 
 # The integration's only internet call, and only when the user opted in.
 EXTERNAL_IP_URL = "https://api.ipify.org/?format=json"

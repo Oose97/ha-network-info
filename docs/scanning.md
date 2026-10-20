@@ -45,9 +45,11 @@ disconnected, it enriches the memory with devices the scanner may never have see
 The integration owns its device list — the router does not have to remember anything
 for the table to be complete.
 
-- Every device ever seen gets a record in HA storage
+- Every device ever seen **online** gets a record in HA storage
   (`.storage/network_info.<entry_id>`), keyed by MAC (by IP until a MAC is first
-  learned, migrating automatically).
+  learned, migrating automatically). A device a router merely remembers, but
+  that has not been online since the integration started tracking, is not
+  listed — it appears from its first online sighting, with an honest first-seen.
 - A record stores `first_seen`, `last_seen` and the last known facts: IP, hostname,
   vendor, router name, connection path.
 - `last_seen` only advances when the device is actually **online**; a router merely
@@ -59,8 +61,14 @@ for the table to be complete.
   cycles, or a router that could not be reached. Once a router answers and does
   not place an online device, that device reads Unknown: a stale label is not
   allowed to outlive the truth.
-- `network_info.forget_device` deletes a record; removing the config entry deletes the
-  store.
+- `network_info.forget_device` deletes a record; the device is listed again, as
+  new, when next seen online — one a router merely remembers stays gone while
+  offline. Removing the config entry deletes the store.
+- **Retention is optional.** With *Forget devices not seen for* set to a number
+  of days, a device that has not been online for that long is forgotten
+  automatically at the next cycle — record and row alike, exactly as
+  `forget_device` would. A device that has never been online counts from when
+  it was first listed. Left empty, devices are kept indefinitely.
 
 ## Name resolution
 
