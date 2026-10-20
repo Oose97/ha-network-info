@@ -465,12 +465,15 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         Live devices update their memory record (first/last seen, last known
         facts); remembered devices absent from this cycle are appended as
         offline rows so they never silently vanish — regardless of whether a
-        router is configured.
+        router is configured. A device enters the memory from its first
+        online sighting: a router remembering a device this integration has
+        never seen online is not a sighting, so such a row is dropped.
         """
         assert self._memory is not None
         memory = self._memory
         now_iso = dt_util.utcnow().isoformat()
         live_keys: set[str] = set()
+        dropped: set[int] = set()
 
         for dev in devices:
             key = dev["mac"] or f"ip:{dev['ip']}"
@@ -482,6 +485,15 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 if rec is not None:
                     memory[key] = rec
             if rec is None:
+                if not dev["online"]:
+                    # Never seen online, only remembered by a router: no
+                    # record and no row. Listing starts with the first time
+                    # the device is actually online — which also keeps a
+                    # forgotten device gone while it stays offline, instead
+                    # of resurrecting it from the router's list with a
+                    # fresh history and a spurious new-device event.
+                    dropped.add(id(dev))
+                    continue
                 rec = {"first_seen": now_iso}
                 memory[key] = rec
                 self._new_keys.add(key)
@@ -546,6 +558,9 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             dev["first_seen"] = rec.get("first_seen")
             dev["last_seen"] = rec.get("last_seen")
             devices.append(dev)
+
+        if dropped:
+            devices[:] = [d for d in devices if id(d) not in dropped]
 
         self._store.async_delay_save(lambda: memory, 30)
 
@@ -686,7 +701,7 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         return True
 
     async def async_forget_device(self, mac: str) -> bool:
-        """Drop a device from memory. An online device reappears next scan."""
+        """Drop a device from memory. It is listed again when next seen online."""
         if self._memory is None:
             return False
         key = mac.strip().lower().replace("-", ":")
