@@ -64,6 +64,11 @@ for the table to be complete.
 - `network_info.forget_device` deletes a record; the device is listed again, as
   new, when next seen online — one a router merely remembers stays gone while
   offline. Removing the config entry deletes the store.
+- **Retention is optional.** With *Forget devices not seen for* set to a number
+  of days, a device that has not been online for that long is forgotten
+  automatically at the next cycle — record and row alike, exactly as
+  `forget_device` would. A device that has never been online counts from when
+  it was first listed. Left empty, devices are kept indefinitely.
 
 ## Name resolution
 

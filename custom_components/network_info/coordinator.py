@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Any
@@ -28,6 +28,7 @@ from .const import (
     CONF_EXTERNAL_IP,
     CONF_EXTERNAL_IP_LOG,
     CONF_IP_RANGE,
+    CONF_RETENTION_DAYS,
     CONF_ROUTER_BRAND,
     CONF_ROUTER_HOST,
     CONF_ROUTER_PASSWORD,
@@ -195,6 +196,8 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
             hass, STORAGE_VERSION, storage_key(entry.entry_id)
         )
         self._memory: dict[str, dict[str, Any]] | None = None
+        # How long an offline device stays remembered; None = forever.
+        self._retention = _retention_from(config)
         # External IP tracking (opt-in). Logging implies tracking.
         self._log_external_ip = bool(config.get(CONF_EXTERNAL_IP_LOG))
         self._track_external_ip = (
@@ -474,6 +477,8 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
         now_iso = dt_util.utcnow().isoformat()
         live_keys: set[str] = set()
         dropped: set[int] = set()
+        cutoff = dt_util.utcnow() - self._retention if self._retention else None
+        forgotten = 0
 
         for dev in devices:
             key = dev["mac"] or f"ip:{dev['ip']}"
@@ -497,6 +502,13 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 rec = {"first_seen": now_iso}
                 memory[key] = rec
                 self._new_keys.add(key)
+            elif cutoff is not None and not dev["online"] and _seen_before(rec, cutoff):
+                # Known, offline, and not seen online within the retention
+                # period: forgotten, record and row alike.
+                memory.pop(key, None)
+                dropped.add(id(dev))
+                forgotten += 1
+                continue
             for field in (
                 "ip", "mac", "hostname", "vendor", "router_name", "access_point"
             ):
@@ -536,8 +548,12 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
                 dev["path_override"] = True
             dev["name_override"] = rec.get("name_override")
 
+        expired: list[str] = []
         for key, rec in memory.items():
             if key in live_keys:
+                continue
+            if cutoff is not None and _seen_before(rec, cutoff):
+                expired.append(key)
                 continue
             dev = _new_device(
                 ip=rec.get("ip"),
@@ -561,6 +577,15 @@ class NetworkInfoCoordinator(DataUpdateCoordinator[NetworkData]):
 
         if dropped:
             devices[:] = [d for d in devices if id(d) not in dropped]
+        for key in expired:
+            memory.pop(key, None)
+        forgotten += len(expired)
+        if forgotten and self._retention is not None:
+            _LOGGER.info(
+                "Forgot %d device(s) not seen online for %d days",
+                forgotten,
+                self._retention.days,
+            )
 
         self._store.async_delay_save(lambda: memory, 30)
 
@@ -831,6 +856,33 @@ def device_key(value: str) -> str:
 def _key_of(dev: dict[str, Any]) -> str:
     """The memory key of a device row."""
     return dev.get("mac") or f"ip:{dev.get('ip')}"
+
+
+def _retention_from(config: dict[str, Any]) -> timedelta | None:
+    """How long an offline device stays remembered; None means forever."""
+    try:
+        days = int(config.get(CONF_RETENTION_DAYS) or 0)
+    except (TypeError, ValueError):
+        return None
+    return timedelta(days=days) if days > 0 else None
+
+
+def _seen_before(rec: dict[str, Any], cutoff: datetime) -> bool:
+    """Whether the record's last online sighting predates the cutoff.
+
+    A device never seen online counts from when it was first listed, so a
+    record that has never had a sighting still ages out.
+    """
+    stamp = rec.get("last_seen") or rec.get("first_seen")
+    if not stamp:
+        return False
+    try:
+        when = datetime.fromisoformat(str(stamp))
+    except ValueError:
+        return False
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when < cutoff
 
 
 def _host_ip(host: str) -> str:

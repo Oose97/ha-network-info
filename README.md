@@ -26,7 +26,8 @@ device also gets its connection path, signal level and the router's name for it.
   ([details](docs/setup.md#access-points)).
 - **The integration owns the memory**: every device ever seen is stored with first- and
   last-seen timestamps and stays listed when it goes offline — surviving restarts and
-  working identically in scan-only mode. The router only enriches the list
+  working identically in scan-only mode — until you forget it from the table, or for
+  as many days as you choose to keep it. The router only enriches the list
   ([details](docs/scanning.md#device-memory)).
 - **Tells you when something joins or leaves** — triggers for a device coming online,
   going offline, or being seen for the first time, offered under Network Info in the
@@ -76,7 +77,8 @@ Go to [Setup](docs/setup.md) for more details.
   card.
 - Router brand defaults to **None (scanning only)**; multiple ranges and multiple
   entries are supported.
-- Everything (range, interval, brand, credentials) is changeable later via Configure.
+- Everything (range, interval, retention, brand, credentials) is changeable later via
+  Configure.
 
 ### Entities & services
 
