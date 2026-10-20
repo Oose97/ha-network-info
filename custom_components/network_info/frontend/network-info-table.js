@@ -324,11 +324,17 @@ class NetworkInfoTable extends HTMLElement {
     });
     // The body repaints wholesale, so row actions are delegated here once.
     this._els.tbody.addEventListener("click", (ev) => {
-      const act = ev.target.closest("[data-copy],[data-open],[data-path],[data-rename]");
+      const act = ev.target.closest(
+        "[data-copy],[data-open],[data-path],[data-rename],[data-forget]"
+      );
       if (!act) return;
       if (act.dataset.copy) { this._copy(act.dataset.copy, act); return; }
       if (act.dataset.open) {
         window.open("http://" + act.dataset.open, "_blank", "noopener");
+        return;
+      }
+      if (act.dataset.forget) {
+        this._openForgetSheet(act.dataset.forget, act.dataset.current);
         return;
       }
       if (act.dataset.rename) {
@@ -436,10 +442,16 @@ class NetworkInfoTable extends HTMLElement {
           const key = d.mac || (d.ip ? `ip:${d.ip}` : "");
           const mark = d.name_override && this._settings.marks
             ? `<span class="ovr" title="Name set manually">✎</span>` : "";
+          // Forgetting is offered on offline rows only: an online device
+          // would simply be listed again next cycle.
+          const forget = key && !d.online
+            ? `<button class="act" data-forget="${esc(key)}" data-current="${esc(d.name)}"` +
+              ` title="Forget device">✕</button>`
+            : "";
           const btn = key
             ? `<span class="cellacts"><button class="act" data-rename="${esc(key)}"` +
               ` data-current="${esc(d.name)}" data-custom="${d.name_override ? "1" : "0"}"` +
-              ` title="Rename">✎</button></span>`
+              ` title="Rename">✎</button>${forget}</span>`
             : "";
           return `<td><strong>${esc(d.name)}</strong>${mark}${btn}</td>`;
         }
@@ -558,6 +570,27 @@ class NetworkInfoTable extends HTMLElement {
     });
     this._els.overlay.classList.add("open");
     input.focus();
+  }
+
+  // ── forget sheet ─────────────────────────────────────────
+  _openForgetSheet(key, name) {
+    this._els.sheet.innerHTML = `
+      <h3>Forget ${esc(name || key)}?</h3>
+      <div class="sect">Removes the device from the integration's memory —
+        its first/last-seen history and any name or path set by hand. If it
+        comes online again it is listed as a new device.</div>
+      <div class="nit-actions">
+        <button id="nit-forget-cancel">Cancel</button>
+        <button id="nit-forget-ok">Forget</button>
+      </div>`;
+    this._els.sheet.querySelector("#nit-forget-cancel")
+      .addEventListener("click", () => this._closeSettings());
+    this._els.sheet.querySelector("#nit-forget-ok").addEventListener("click", () => {
+      if (!this._hass) return;
+      this._hass.callService("network_info", "forget_device", { mac: key });
+      this._closeSettings();
+    });
+    this._els.overlay.classList.add("open");
   }
 
   // ── settings sheet ───────────────────────────────────────

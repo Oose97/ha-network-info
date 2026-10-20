@@ -89,6 +89,12 @@ path/signal columns empty:
   is available as the `network_info.set_name` service.
 
   ![The rename sheet — custom name, or back to the automatic one](images/network_devices_rename.jpg)
+- **Offline rows also offer ✕ forget** in the Name cell — a confirmation sheet,
+  then the device is removed from the integration's memory with its history and
+  any name or path set by hand. A device that comes online again is listed as
+  new; one a router merely remembers stays gone while offline. Online rows have
+  no forget action, since the device would simply be listed again next cycle.
+  The same is available as the `network_info.forget_device` service.
 - **Click a path badge to pin the path by hand** — a sheet offers Automatic plus
   every path. A pinned path outranks whatever scanning and router polling say
   (that is its point: it covers devices nothing can observe, like clients of an
